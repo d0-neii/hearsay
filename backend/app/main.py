@@ -49,6 +49,10 @@ _scheduler = BackgroundScheduler(timezone="Asia/Seoul")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 감성 분석 모델 선(先)로드 — 첫 크롤링 전에 준비
+    from app.sentiment import get_pipeline
+    get_pipeline()
+
     _scheduler.add_job(crawl_all, "interval", minutes=10, next_run_time=datetime.now())
     _scheduler.start()
     print("스케줄러 시작 — 즉시 크롤링 후 10분마다 반복합니다.")

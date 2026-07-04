@@ -112,7 +112,9 @@ def save_posts(posts: list[dict]) -> int:
 
 
 def crawl_all():
-    """전체 종목 크롤링 실행"""
+    """전체 종목 크롤링 + 감성 분석 파이프라인 실행"""
+    from app.sentiment import score_all_posts
+
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 크롤링 시작...")
     total = 0
 
@@ -122,7 +124,11 @@ def crawl_all():
         print(f"  {name}({code}): {len(posts)}개 수집, {saved}개 저장")
         total += saved
 
-    print(f"크롤링 완료 — 총 {total}개 저장\n")
+    print(f"크롤링 완료 — 총 {total}개 저장")
+
+    # 새로 저장된 게시글 감성 분석
+    scored = score_all_posts()
+    print(f"감성 분석 완료 — {scored}개 채점\n")
 
 
 if __name__ == "__main__":

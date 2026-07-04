@@ -1,56 +1,84 @@
+from __future__ import annotations
+
+from transformers import pipeline
 from sqlalchemy import text
 from app.database import SessionLocal
 
-# 긍정/부정 키워드 (주식 커뮤니티 특화)
-POSITIVE_KEYWORDS = [
-    "상승", "급등", "오른다", "올랐", "올라", "매수", "강세", "반등", "돌파",
-    "신고가", "기대", "호재", "좋다", "좋은", "긍정", "추천", "사자", "담아",
-    "가즈아", "ㄱㄱ", "불장", "목표가", "익절", "수익", "흑자", "성장",
-]
+MODEL_NAME = "snunlp/KR-FinBert-SC"
 
-NEGATIVE_KEYWORDS = [
-    "하락", "급락", "떨어진", "떨어져", "매도", "약세", "하한가", "손절",
-    "악재", "위험", "걱정", "불안", "팔자", "버려", "폭락", "최저", "적자",
-    "손실", "물렸", "물타기", "탈출", "지옥", "망했", "ㅠ", "ㅜ", "개망",
-]
+# 앱 수명 동안 1회만 로드 (get_pipeline() 첫 호출 시)
+_pipeline = None
 
 
-def compute_sentiment(title: str) -> float:
+def get_pipeline():
+    global _pipeline
+    if _pipeline is None:
+        print(f"[sentiment] 모델 로드 중: {MODEL_NAME}")
+        _pipeline = pipeline(
+            "text-classification",
+            model=MODEL_NAME,
+            top_k=None,       # 전체 라벨 확률 반환
+            truncation=True,
+            max_length=512,
+        )
+        print("[sentiment] 모델 로드 완료")
+    return _pipeline
+
+
+def compute_sentiment(text: str) -> float:
     """
-    제목 키워드 기반 단순 감성 점수 계산
-    반환값: -1.0 (매우 부정) ~ 1.0 (매우 긍정)
+    KR-FinBert-SC 기반 감성 점수.
+    반환값: P(positive) - P(negative)  →  -1.0 ~ 1.0
+    중립일수록 0에 가까워짐.
     """
-    pos = sum(1 for kw in POSITIVE_KEYWORDS if kw in title)
-    neg = sum(1 for kw in NEGATIVE_KEYWORDS if kw in title)
-
-    total = pos + neg
-    if total == 0:
+    if not text or not text.strip():
         return 0.0
 
-    return round((pos - neg) / total, 2)
+    pipe = get_pipeline()
+    results = pipe(text)[0]   # [{"label": "positive", "score": 0.9}, ...]
+
+    probs = {r["label"]: r["score"] for r in results}
+    return round(probs.get("positive", 0.0) - probs.get("negative", 0.0), 3)
 
 
-def score_all_posts():
-    """sentiment_score가 없는 게시글 전체에 감성 점수 부여"""
+def score_all_posts(batch_size: int = 32) -> int:
+    """
+    sentiment_score가 NULL인 게시글을 배치로 분석해서 업데이트.
+    반환값: 채점된 게시글 수
+    """
     db = SessionLocal()
     try:
-        result = db.execute(text(
+        rows = db.execute(text(
             "SELECT id, title FROM posts WHERE sentiment_score IS NULL"
-        ))
-        posts = result.fetchall()
+        )).fetchall()
 
-        print(f"{len(posts)}개 게시글 감성 분석 중...")
-        for post_id, title in posts:
-            score = compute_sentiment(title)
-            db.execute(text(
-                "UPDATE posts SET sentiment_score = :score WHERE id = :id"
-            ), {"score": score, "id": post_id})
+        if not rows:
+            return 0
 
-        db.commit()
-        print("감성 분석 완료!")
+        print(f"[sentiment] {len(rows)}개 게시글 감성 분석 시작...")
+        pipe = get_pipeline()
+
+        # 배치 단위 추론 (메모리 안전)
+        for i in range(0, len(rows), batch_size):
+            batch = rows[i : i + batch_size]
+            texts = [row.title or "" for row in batch]
+
+            batch_results = pipe(texts, batch_size=batch_size)
+
+            for row, result in zip(batch, batch_results):
+                probs = {r["label"]: r["score"] for r in result}
+                score = round(
+                    probs.get("positive", 0.0) - probs.get("negative", 0.0), 3
+                )
+                db.execute(
+                    text("UPDATE posts SET sentiment_score = :s WHERE id = :id"),
+                    {"s": score, "id": row.id},
+                )
+
+            db.commit()
+            print(f"[sentiment]  {min(i + batch_size, len(rows))}/{len(rows)} 완료")
+
+        print("[sentiment] 감성 분석 완료")
+        return len(rows)
     finally:
         db.close()
-
-
-if __name__ == "__main__":
-    score_all_posts()
