@@ -11,6 +11,12 @@ export const stockSummarySchema = z
     negative: z.number(),
     avg_score: z.number(),
     positive_ratio: z.number(),
+    // 카드용 신규 필드 — optional: 백엔드 미배포 시에도 파싱 오류 없이 graceful degradation
+    today_total: z.number().optional(),
+    today_positive_ratio: z.number().nullable().optional(),
+    prev_positive_ratio: z.number().nullable().optional(),
+    post_count_ratio: z.number().nullable().optional(),
+    hot_keyword: z.string().nullable().optional(),
   })
   .transform((raw) => ({
     stockCode: raw.stock_code,
@@ -20,6 +26,12 @@ export const stockSummarySchema = z
     negativePostCount: raw.negative,
     avgSentimentScore: raw.avg_score,
     positiveRatio: raw.positive_ratio,
+    // 카드용 신규 필드
+    todayTotalCount: raw.today_total ?? null,
+    todayPositiveRatio: raw.today_positive_ratio ?? null,
+    prevPositiveRatio: raw.prev_positive_ratio ?? null,
+    postCountRatio: raw.post_count_ratio ?? null,
+    hotKeyword: raw.hot_keyword ?? null,
   }))
 
 export const postItemSchema = z

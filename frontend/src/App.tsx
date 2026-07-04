@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { StockSidebar } from './components/StockSidebar'
 import { SentimentChart } from './components/SentimentChart'
+import { StatCards } from './components/StatCard'
 import { PostFeed } from './components/PostFeed'
 import { AskPanel } from './components/AskPanel'
 import { useStockList, usePostFeed, useSentimentChart } from './hooks/useStockQueries'
@@ -17,9 +18,15 @@ export default function App() {
 
   const { data: postFeed = [] } = usePostFeed(selectedStock?.stockCode)
   const { data: sentimentChartData = [] } = useSentimentChart(selectedStock?.stockCode)
-  const { mutate: askQuestion, isPending: isAsking, data: askResult } = useAskQuestion(selectedStock?.stockCode)
+  const { mutate: askQuestion, isPending: isAsking, data: askResult, reset: resetAsk } = useAskQuestion(selectedStock?.stockCode)
 
-  const positiveRatio = selectedStock ? Math.round(selectedStock.positiveRatio) : 50
+  useEffect(() => {
+    resetAsk()
+  }, [selectedStock?.stockCode, resetAsk])
+
+  const positiveRatio = selectedStock
+    ? Math.round(selectedStock.todayPositiveRatio ?? selectedStock.positiveRatio)
+    : 50
 
   return (
     <div className="grid grid-cols-[220px_1fr_300px] h-screen overflow-hidden">
@@ -50,7 +57,7 @@ export default function App() {
 
             <div className="flex items-center gap-2.5">
               <span className="text-xs font-semibold whitespace-nowrap text-positive">
-                매수 우세 {positiveRatio}%
+                매수 {positiveRatio}%
               </span>
               <div className="flex-1 flex h-1.5 rounded-full overflow-hidden">
                 <div
@@ -67,11 +74,14 @@ export default function App() {
               </span>
             </div>
 
+            <StatCards stock={selectedStock} askResult={askResult} />
+
             {sentimentChartData.length > 0 && (
               <SentimentChart data={sentimentChartData} />
             )}
 
             <AskPanel
+              key={selectedStock.stockCode}
               isAsking={isAsking}
               askResult={askResult}
               onAskQuestion={askQuestion}
