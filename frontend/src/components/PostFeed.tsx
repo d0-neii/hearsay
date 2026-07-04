@@ -1,0 +1,50 @@
+import type { PostItem } from '../types'
+import { classifySentiment, SENTIMENT_LABEL_KO } from '../utils/sentiment'
+
+type Props = {
+  postFeed: PostItem[]
+}
+
+const SentimentBadge = ({ sentimentScore }: { sentimentScore: number | null }) => {
+  const label = classifySentiment(sentimentScore)
+  const styleMap = {
+    positive: 'bg-positive-bg text-positive',
+    negative: 'bg-negative-bg text-negative',
+    neutral: 'bg-neutral-bg text-muted',
+  }
+  return (
+    <span className={`text-[10px] font-semibold px-[7px] py-[2px] rounded-[10px] ${styleMap[label]}`}>
+      {SENTIMENT_LABEL_KO[label]}
+    </span>
+  )
+}
+
+const formatTimeAgo = (postedAt: string) => {
+  const diffMinutes = Math.floor((Date.now() - new Date(postedAt).getTime()) / 60000)
+  if (diffMinutes < 1) return '방금'
+  if (diffMinutes < 60) return `${diffMinutes}분 전`
+  if (diffMinutes < 60 * 24) return `${Math.floor(diffMinutes / 60)}시간 전`
+  return `${Math.floor(diffMinutes / 1440)}일 전`
+}
+
+export const PostFeed = ({ postFeed }: Props) => {
+  return (
+    <aside className="bg-surface border-l border-border flex flex-col overflow-hidden">
+      <div className="flex items-center gap-2 p-4 border-b border-border-light">
+        <span className="w-[7px] h-[7px] bg-positive-bar rounded-full animate-blink" />
+        <span className="text-xs font-semibold text-secondary tracking-[0.5px]">실시간 게시글</span>
+      </div>
+      <div className="flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent]">
+        {postFeed.map((post) => (
+          <div key={post.id} className="px-4 py-3 border-b border-border-light transition-colors duration-[120ms] hover:bg-surface-hover">
+            <div className="flex items-center justify-between mb-1.5">
+              <SentimentBadge sentimentScore={post.sentimentScore} />
+              <span className="text-[11px] text-muted">{formatTimeAgo(post.postedAt)}</span>
+            </div>
+            <p className="text-xs text-primary leading-[1.5] line-clamp-2">{post.title}</p>
+          </div>
+        ))}
+      </div>
+    </aside>
+  )
+}
