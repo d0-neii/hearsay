@@ -32,8 +32,7 @@ def fetch_posts(stock_code: str, stock_name: str, pages: int = 3) -> list[dict]:
 
         try:
             res = requests.get(url, headers=HEADERS, timeout=10)
-            res.encoding = "euc-kr"
-            soup = BeautifulSoup(res.text, "html.parser")
+            soup = BeautifulSoup(res.content, "html.parser", from_encoding="euc-kr")
         except Exception as e:
             print(f"[{stock_name}] 페이지 {page} 요청 실패: {e}")
             continue
