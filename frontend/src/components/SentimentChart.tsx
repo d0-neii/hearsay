@@ -27,7 +27,7 @@ export const SentimentChart = ({ data }: Props) => {
     <div className="bg-surface border border-border rounded-lg px-5 py-4">
       <p className="text-[11px] font-semibold text-muted mb-3 uppercase tracking-[0.5px]">시간대별 여론 추이</p>
       <ResponsiveContainer width="100%" height={160}>
-        <AreaChart data={chartData} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
+        <AreaChart data={chartData} margin={{ top: 4, right: 8, left: -10, bottom: 8 }}>
           <defs>
             <linearGradient id="sentimentGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="var(--color-positive-bar)" stopOpacity={0.3} />
