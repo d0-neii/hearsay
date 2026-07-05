@@ -225,3 +225,9 @@ dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Fine-tuned 모델 (용량 큼)
+backend/finetuned_model/
+
+# Claude 로컬 설정
+.claude/
