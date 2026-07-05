@@ -4,7 +4,11 @@ from transformers import pipeline
 from sqlalchemy import text
 from app.database import SessionLocal
 
-MODEL_NAME = "snunlp/KR-FinBert-SC"
+import os
+from pathlib import Path
+
+_FINETUNED = Path(__file__).parent.parent / "finetuned_model"
+MODEL_NAME = str(_FINETUNED) if _FINETUNED.exists() else "snunlp/KR-FinBert-SC"
 
 # 앱 수명 동안 1회만 로드 (get_pipeline() 첫 호출 시)
 _pipeline = None
