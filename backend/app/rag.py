@@ -2,6 +2,7 @@ from sqlalchemy import text
 from openai import OpenAI
 from app.database import SessionLocal
 from app.embedder import get_embedding
+from app.bm25_index import search as bm25_search
 from dotenv import load_dotenv
 import os
 
@@ -9,11 +10,13 @@ load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# RRF 상수: 순위 충격 완화용
+_RRF_K = 60
 
-def search_similar_posts(query: str, stock_code: str = None, top_k: int = 5) -> list[dict]:
-    """질문과 의미적으로 유사한 게시글 TOP K 검색. stock_code 지정 시 해당 종목만 검색"""
+
+def _vector_search(query: str, stock_code: str | None, top_k: int) -> list[dict]:
+    """벡터 유사도 기반 검색. 거리(distance) 오름차순 top_k 반환."""
     query_vector = get_embedding(query)
-
     db = SessionLocal()
     try:
         if stock_code:
@@ -30,11 +33,7 @@ def search_similar_posts(query: str, stock_code: str = None, top_k: int = 5) -> 
                 WHERE p.stock_code = :stock_code
                 ORDER BY distance ASC
                 LIMIT :top_k
-            """), {
-                "query_vector": str(query_vector),
-                "stock_code": stock_code,
-                "top_k": top_k,
-            })
+            """), {"query_vector": str(query_vector), "stock_code": stock_code, "top_k": top_k})
         else:
             result = db.execute(text("""
                 SELECT
@@ -48,10 +47,7 @@ def search_similar_posts(query: str, stock_code: str = None, top_k: int = 5) -> 
                 JOIN posts p ON pe.post_id = p.id
                 ORDER BY distance ASC
                 LIMIT :top_k
-            """), {
-                "query_vector": str(query_vector),
-                "top_k": top_k,
-            })
+            """), {"query_vector": str(query_vector), "top_k": top_k})
 
         rows = result.fetchall()
         return [
@@ -67,6 +63,58 @@ def search_similar_posts(query: str, stock_code: str = None, top_k: int = 5) -> 
         ]
     finally:
         db.close()
+
+
+def _reciprocal_rank_fusion(
+    vector_results: list[dict],
+    bm25_results: list[dict],
+    top_k: int,
+) -> list[dict]:
+    """
+    RRF (Reciprocal Rank Fusion)로 두 검색 결과를 합산
+    """
+    rrf_scores: dict[int, float] = {}
+    meta_map: dict[int, dict] = {}
+
+    # 벡터 검색 결과 반영
+    for rank, post in enumerate(vector_results, start=1):
+        pid = post["id"]
+        rrf_scores[pid] = rrf_scores.get(pid, 0.0) + 1.0 / (_RRF_K + rank)
+        meta_map[pid] = post
+
+    # BM25 검색 결과 반영 (post_id 키가 "post_id"임에 주의)
+    for rank, post in enumerate(bm25_results, start=1):
+        pid = post["post_id"]
+        rrf_scores[pid] = rrf_scores.get(pid, 0.0) + 1.0 / (_RRF_K + rank)
+        if pid not in meta_map:
+            meta_map[pid] = {
+                "id": pid,
+                "stock_name": post["stock_name"],
+                "stock_code": post["stock_code"],
+                "title": post["title"],
+                "posted_at": post["posted_at"],
+                "distance": None,
+            }
+
+    # 점수 내림차순 정렬 후 top_k 슬라이싱
+    sorted_ids = sorted(rrf_scores, key=lambda pid: rrf_scores[pid], reverse=True)
+    return [meta_map[pid] for pid in sorted_ids[:top_k]]
+
+
+def search_similar_posts(query: str, stock_code: str = None, top_k: int = 5) -> list[dict]:
+    """
+    Hybrid Search (BM25 + Vector) + RRF 기반 유사 게시글 검색.
+
+    1. 벡터 검색으로 후보 top-20 추출
+    2. BM25 검색으로 후보 top-20 추출
+    3. RRF로 두 결과 합산 → 최종 top_k 반환
+    """
+    CANDIDATE_K = 20  # 각 검색에서 뽑을 후보 수
+
+    vector_results = _vector_search(query, stock_code=stock_code, top_k=CANDIDATE_K)
+    bm25_results = bm25_search(query, top_k=CANDIDATE_K, stock_code=stock_code)
+
+    return _reciprocal_rank_fusion(vector_results, bm25_results, top_k=top_k)
 
 
 def ask(query: str, stock_code: str = None) -> dict:

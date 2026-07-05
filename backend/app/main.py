@@ -60,6 +60,10 @@ async def lifespan(app: FastAPI):
     from app.sentiment import get_pipeline
     get_pipeline()
 
+    # BM25 인덱스 초기 빌드 — 기존 게시글 대상
+    from app.bm25_index import rebuild_index
+    rebuild_index()
+
     _scheduler.add_job(crawl_all, "interval", minutes=10, next_run_time=datetime.now())
     _scheduler.start()
     print("스케줄러 시작 — 즉시 크롤링 후 10분마다 반복합니다.")

@@ -128,7 +128,12 @@ def crawl_all():
 
     # 새로 저장된 게시글 감성 분석
     scored = score_all_posts()
-    print(f"감성 분석 완료 — {scored}개 채점\n")
+    print(f"감성 분석 완료 — {scored}개 채점")
+
+    # BM25 인덱스 갱신 (새 게시글 반영)
+    from app.bm25_index import rebuild_index
+    rebuild_index()
+    print()
 
 
 if __name__ == "__main__":
