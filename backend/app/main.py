@@ -1,15 +1,22 @@
+import json
 import re
 from collections import Counter
 from contextlib import asynccontextmanager
 from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from openai import OpenAI
 from pydantic import BaseModel
 from sqlalchemy import text
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.rag import ask
 from app.database import SessionLocal
 from app.crawler import crawl_all
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # 키워드 추출용 불용어
 _STOP_WORDS = {
@@ -159,6 +166,55 @@ def get_stocks():
             }
             for row in rows
         ]
+    finally:
+        db.close()
+
+
+@app.get("/stocks/{stock_code}/daily-summary")
+def get_daily_summary(stock_code: str):
+    """오늘 게시글 기반 자동 요약 (이슈/호재/악재)"""
+    db = SessionLocal()
+    try:
+        rows = db.execute(text("""
+            SELECT title
+            FROM posts
+            WHERE stock_code = :code AND DATE(posted_at) = CURRENT_DATE
+            ORDER BY posted_at DESC
+            LIMIT 40
+        """), {"code": stock_code}).fetchall()
+
+        if not rows:
+            return {"items": [], "generated_at": datetime.now().isoformat()}
+
+        titles = "\n".join(f"- {r.title}" for r in rows)
+
+        response = _openai.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=400,
+            response_format={"type": "json_object"},
+            messages=[{
+                "role": "user",
+                "content": f"""주식 커뮤니티 게시글 제목들을 분석해서 오늘의 주요 내용을 2~3개로 요약하세요.
+
+반드시 아래 JSON 형식으로만 응답하세요:
+{{"items": [{{"type": "이슈|호재|악재", "text": "한 줄 요약"}}]}}
+
+- 이슈: 중립적 주요 사건
+- 호재: 긍정적 내용
+- 악재: 부정적 내용
+
+게시글 제목:
+{titles}"""
+            }]
+        )
+
+        result = json.loads(response.choices[0].message.content)
+        return {
+            "items": result.get("items", []),
+            "generated_at": datetime.now().isoformat(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 
