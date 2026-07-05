@@ -1,3 +1,4 @@
+import time
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -23,8 +24,49 @@ HEADERS = {
 }
 
 
+def _extract_nid(source_url: str) -> str | None:
+    """source_url에서 nid 파라미터 추출. 예: ...&nid=424636515 → '424636515'"""
+    import re
+    match = re.search(r"nid=(\d+)", source_url)
+    return match.group(1) if match else None
+
+
+def fetch_post_detail(source_url: str) -> dict:
+    """
+    네이버 종토방 API로 전체 제목 + 본문 가져오기
+    """
+    nid = _extract_nid(source_url)
+    if not nid:
+        return {"title": None, "content": None}
+
+    try:
+        api_url = f"https://m.stock.naver.com/front-api/discussion/detail?id={nid}"
+        res = requests.get(api_url, headers=HEADERS, timeout=10)
+        data = res.json()
+
+        result = data.get("result", {})
+        title = result.get("title")
+
+        # contentHtml에서 텍스트만 추출
+        content_html = result.get("contentHtml", "")
+        if content_html:
+            soup = BeautifulSoup(content_html, "html.parser")
+            content = soup.get_text(separator="\n", strip=True)
+        else:
+            content = None
+
+        return {"title": title, "content": content}
+
+    except Exception as e:
+        print(f"  [detail] 요청 실패 (nid={nid}): {e}")
+        return {"title": None, "content": None}
+
+
 def fetch_posts(stock_code: str, stock_name: str, pages: int = 3) -> list[dict]:
-    """종토방 게시글을 가져와서 딕셔너리 리스트로 반환"""
+    """
+    종토방 게시글 목록 수집 → 각 게시글 상세 페이지 방문해서
+    전체 제목 + 본문 저장.
+    """
     posts = []
 
     for page in range(1, pages + 1):
@@ -44,16 +86,16 @@ def fetch_posts(stock_code: str, stock_name: str, pages: int = 3) -> list[dict]:
             if len(cols) < 5:
                 continue
 
-            # 제목 및 URL
             title_tag = cols[1].select_one("a")
             if not title_tag:
                 continue
 
-            title = title_tag.get_text(strip=True)
+            # 목록 제목 (잘릴 수 있음 — 상세 페이지에서 덮어씀)
+            list_title = title_tag.get_text(strip=True)
             href = title_tag.get("href", "")
             source_url = f"https://finance.naver.com{href}" if href else None
 
-            if not source_url or not title:
+            if not source_url or not list_title:
                 continue
 
             # 작성자
@@ -77,16 +119,24 @@ def fetch_posts(stock_code: str, stock_name: str, pages: int = 3) -> list[dict]:
             except ValueError:
                 likes = 0
 
+            # 개별 게시글 페이지 → 전체 제목 + 본문
+            detail = fetch_post_detail(source_url)
+            full_title = detail["title"] or list_title  # 실패 시 목록 제목으로 폴백
+            content = detail["content"]
+
             posts.append({
                 "stock_code": stock_code,
                 "stock_name": stock_name,
-                "title": title,
+                "title": full_title,
+                "content": content,
                 "author": author,
                 "views": views,
                 "likes": likes,
                 "source_url": source_url,
                 "posted_at": posted_at,
             })
+
+            time.sleep(0.3)  # 네이버 서버 부하 방지
 
     return posts
 
