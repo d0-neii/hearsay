@@ -73,7 +73,7 @@ const askSourceSchema = z
     stock_code: z.string(),
     title: z.string(),
     posted_at: z.string(),
-    distance: z.number(),
+    distance: z.number().nullable(),
   })
   .transform((raw) => ({
     id: raw.id,
