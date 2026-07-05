@@ -1,5 +1,6 @@
 import type { PostItem } from '../types'
 import { classifySentiment, SENTIMENT_LABEL_KO } from '../utils/sentiment'
+import { formatTimeAgo } from '../utils/time'
 
 type Props = {
   postFeed: PostItem[]
@@ -17,14 +18,6 @@ const SentimentBadge = ({ sentimentScore }: { sentimentScore: number | null }) =
       {SENTIMENT_LABEL_KO[label]}
     </span>
   )
-}
-
-const formatTimeAgo = (postedAt: string) => {
-  const diffMinutes = Math.floor((Date.now() - new Date(postedAt).getTime()) / 60000)
-  if (diffMinutes < 1) return '방금'
-  if (diffMinutes < 60) return `${diffMinutes}분 전`
-  if (diffMinutes < 60 * 24) return `${Math.floor(diffMinutes / 60)}시간 전`
-  return `${Math.floor(diffMinutes / 1440)}일 전`
 }
 
 export const PostFeed = ({ postFeed }: Props) => {
