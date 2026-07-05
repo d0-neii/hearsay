@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from transformers import pipeline
 from sqlalchemy import text
-from app.database import SessionLocal
+from app.core.database import SessionLocal
 
 import os
 from pathlib import Path

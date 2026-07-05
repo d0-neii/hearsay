@@ -1,6 +1,6 @@
 from openai import OpenAI
 from sqlalchemy import text
-from app.database import SessionLocal, engine
+from app.core.database import SessionLocal, engine
 from app.models import Post, PostEmbedding
 from dotenv import load_dotenv
 import os

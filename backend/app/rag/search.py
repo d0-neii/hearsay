@@ -1,53 +1,98 @@
+import re
+from datetime import datetime, timedelta
 from sqlalchemy import text
-from openai import OpenAI
-from app.database import SessionLocal
+from app.core.database import SessionLocal
 from app.embedder import get_embedding
-from app.bm25_index import search as bm25_search
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+from .bm25_index import search as bm25_search
 
 # RRF 상수: 순위 충격 완화용
 _RRF_K = 60
 
 
-def _vector_search(query: str, stock_code: str | None, top_k: int) -> list[dict]:
+def _parse_date_range(query: str) -> tuple[datetime | None, datetime | None]:
+    """
+    쿼리 텍스트에서 날짜 의도를 파싱해 (date_from, date_to) 반환.
+
+    오늘  → 오늘 00:00 ~ 내일 00:00
+    어제  → 어제 00:00 ~ 오늘 00:00
+    이번 주 / 최근 → 7일 전 ~ 내일
+    명시 없음 → 최근 3일 (기본값)
+    """
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    tomorrow = today + timedelta(days=1)
+
+    q = query.lower()
+
+    if re.search(r'오늘|today', q):
+        return today, tomorrow
+
+    if re.search(r'어제|yesterday', q):
+        return today - timedelta(days=1), today
+
+    if re.search(r'이번\s*주|지난\s*7일|일주일|한\s*주', q):
+        return today - timedelta(days=7), tomorrow
+
+    if re.search(r'이번\s*달|지난\s*달|한\s*달', q):
+        return today - timedelta(days=30), tomorrow
+
+    # 기본값: 최근 3일
+    return today - timedelta(days=3), tomorrow
+
+
+def _vector_search(
+    query: str,
+    stock_code: str | None,
+    top_k: int,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> list[dict]:
     """벡터 유사도 기반 검색. 거리(distance) 오름차순 top_k 반환."""
     query_vector = get_embedding(query)
     db = SessionLocal()
     try:
+        # 날짜 필터 조건 동적 생성
+        date_clause = ""
+        params: dict = {"query_vector": str(query_vector), "top_k": top_k}
+        if date_from:
+            date_clause += " AND p.posted_at >= :date_from"
+            params["date_from"] = date_from
+        if date_to:
+            date_clause += " AND p.posted_at < :date_to"
+            params["date_to"] = date_to
+
         if stock_code:
-            result = db.execute(text("""
+            params["stock_code"] = stock_code
+            result = db.execute(text(f"""
                 SELECT
                     p.id,
                     p.stock_name,
                     p.stock_code,
                     p.title,
                     p.posted_at,
+                    p.source_type,
                     pe.embedding <=> CAST(:query_vector AS vector) AS distance
                 FROM post_embeddings pe
                 JOIN posts p ON pe.post_id = p.id
-                WHERE p.stock_code = :stock_code
+                WHERE p.stock_code = :stock_code{date_clause}
                 ORDER BY distance ASC
                 LIMIT :top_k
-            """), {"query_vector": str(query_vector), "stock_code": stock_code, "top_k": top_k})
+            """), params)
         else:
-            result = db.execute(text("""
+            result = db.execute(text(f"""
                 SELECT
                     p.id,
                     p.stock_name,
                     p.stock_code,
                     p.title,
                     p.posted_at,
+                    p.source_type,
                     pe.embedding <=> CAST(:query_vector AS vector) AS distance
                 FROM post_embeddings pe
                 JOIN posts p ON pe.post_id = p.id
+                WHERE 1=1{date_clause}
                 ORDER BY distance ASC
                 LIMIT :top_k
-            """), {"query_vector": str(query_vector), "top_k": top_k})
+            """), params)
 
         rows = result.fetchall()
         return [
@@ -57,6 +102,7 @@ def _vector_search(query: str, stock_code: str | None, top_k: int) -> list[dict]
                 "stock_code": row.stock_code,
                 "title": row.title,
                 "posted_at": str(row.posted_at),
+                "source_type": row.source_type or "community",
                 "distance": row.distance,
             }
             for row in rows
@@ -93,6 +139,7 @@ def _reciprocal_rank_fusion(
                 "stock_code": post["stock_code"],
                 "title": post["title"],
                 "posted_at": post["posted_at"],
+                "source_type": post.get("source_type", "community"),
                 "distance": None,
             }
 
@@ -105,67 +152,22 @@ def search_similar_posts(query: str, stock_code: str = None, top_k: int = 5) -> 
     """
     Hybrid Search (BM25 + Vector) + RRF 기반 유사 게시글 검색.
 
-    1. 벡터 검색으로 후보 top-20 추출
-    2. BM25 검색으로 후보 top-20 추출
-    3. RRF로 두 결과 합산 → 최종 top_k 반환
+    1. 쿼리에서 날짜 의도 파싱 (오늘/어제/이번주 등)
+    2. 벡터 검색으로 후보 top-20 추출
+    3. BM25 검색으로 후보 top-20 추출
+    4. RRF로 두 결과 합산 → 최종 top_k 반환
     """
-    CANDIDATE_K = 20  # 각 검색에서 뽑을 후보 수
+    CANDIDATE_K = 20
 
-    vector_results = _vector_search(query, stock_code=stock_code, top_k=CANDIDATE_K)
-    bm25_results = bm25_search(query, top_k=CANDIDATE_K, stock_code=stock_code)
+    date_from, date_to = _parse_date_range(query)
 
-    return _reciprocal_rank_fusion(vector_results, bm25_results, top_k=top_k)
-
-
-def ask(query: str, stock_code: str = None) -> dict:
-    """RAG 기반 질의응답"""
-
-    # 1. 유사 게시글 검색
-    similar_posts = search_similar_posts(query, stock_code=stock_code, top_k=5)
-
-    if not similar_posts:
-        return {
-            "answer": "관련 게시글을 찾을 수 없습니다.",
-            "sources": [],
-        }
-
-    # 2. 게시글 목록을 컨텍스트로 정리
-    context = "\n".join([
-        f"- [{post['stock_name']}] {post['title']} ({post['posted_at'][:10]})"
-        for post in similar_posts
-    ])
-
-    # 3. GPT에게 질문에 직접 답하도록 요청
-    prompt = f"""당신은 주식 커뮤니티 게시글을 바탕으로 사용자 질문에 답해주는 분석가입니다.
-아래 게시글 제목들은 사용자 질문과 관련된 커뮤니티 글입니다.
-
-[사용자 질문]
-{query}
-
-[관련 게시글]
-{context}
-
-위 게시글들을 근거로 사용자 질문에 직접 답해주세요.
-- 질문이 이유를 묻는다면 커뮤니티에서 언급된 이유들을 알려주세요.
-- 질문이 전망을 묻는다면 커뮤니티 의견을 바탕으로 전망을 알려주세요.
-- 2~3문장으로 간결하게, 커뮤니티 여론 기반임을 명시하세요."""
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        max_tokens=500,
-        messages=[{"role": "user", "content": prompt}],
+    vector_results = _vector_search(
+        query, stock_code=stock_code, top_k=CANDIDATE_K,
+        date_from=date_from, date_to=date_to,
+    )
+    bm25_results = bm25_search(
+        query, top_k=CANDIDATE_K, stock_code=stock_code,
+        date_from=date_from, date_to=date_to,
     )
 
-    return {
-        "answer": response.choices[0].message.content,
-        "sources": similar_posts,
-    }
-
-
-if __name__ == "__main__":
-    result = ask("요즘 분위기 어때?", stock_code="005930")  # 삼성전자
-    print("=== 답변 ===")
-    print(result["answer"])
-    print("\n=== 참고 게시글 ===")
-    for post in result["sources"]:
-        print(f"  [{post['stock_name']}] {post['title']}")
+    return _reciprocal_rank_fusion(vector_results, bm25_results, top_k=top_k)

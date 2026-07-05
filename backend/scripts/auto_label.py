@@ -14,11 +14,11 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from openai import OpenAI
 from sqlalchemy import text
-from app.database import SessionLocal
+from app.core.database import SessionLocal
 from dotenv import load_dotenv
 import os
 
@@ -26,7 +26,7 @@ load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-OUTPUT_FILE = Path(__file__).parent / "labeled_data.csv"
+OUTPUT_FILE = Path(__file__).parent.parent / "labeled_data.csv"
 BATCH_SIZE = 20   # GPT에 한 번에 넘길 게시글 수
 SLEEP_SEC = 1.0   # 배치 간 딜레이 (rate limit 방지)
 

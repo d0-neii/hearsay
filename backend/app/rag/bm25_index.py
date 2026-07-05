@@ -10,10 +10,11 @@ BM25 인덱스 모듈
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Optional
 from rank_bm25 import BM25Okapi
 from sqlalchemy import text
-from app.database import SessionLocal
+from app.core.database import SessionLocal
 
 
 def _tokenize(text: str) -> list[str]:
@@ -44,7 +45,7 @@ def rebuild_index() -> int:
     db = SessionLocal()
     try:
         rows = db.execute(text("""
-            SELECT id, stock_name, stock_code, title, posted_at
+            SELECT id, stock_name, stock_code, title, posted_at, source_type
             FROM posts
             WHERE title IS NOT NULL
             ORDER BY id
@@ -69,6 +70,7 @@ def rebuild_index() -> int:
             "stock_code": row.stock_code,
             "title": row.title,
             "posted_at": str(row.posted_at),
+            "source_type": row.source_type or "community",
         }
 
     _bm25 = BM25Okapi(corpus)
@@ -79,12 +81,18 @@ def rebuild_index() -> int:
     return len(ids)
 
 
-def search(query: str, top_k: int = 20, stock_code: str | None = None) -> list[dict]:
+def search(
+    query: str,
+    top_k: int = 20,
+    stock_code: str | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> list[dict]:
     """
     BM25 점수 기준 상위 top_k 게시글 반환.
-    stock_code 지정 시 해당 종목만 필터링.
+    stock_code, date_from, date_to 지정 시 필터링.
 
-    반환: [{"post_id", "stock_name", "stock_code", "title", "posted_at", "bm25_score"}, ...]
+    반환: [{"post_id", "stock_name", "stock_code", "title", "posted_at", "source_type", "bm25_score"}, ...]
     """
     if _bm25 is None:
         rebuild_index()
@@ -108,16 +116,30 @@ def search(query: str, top_k: int = 20, stock_code: str | None = None) -> list[d
     results = []
     for score, post_id in ranked:
         if score <= 0:
-            break  # 관련 없는 문서는 스킵
+            break
         meta = _post_meta.get(post_id, {})
         if stock_code and meta.get("stock_code") != stock_code:
             continue
+
+        # 날짜 필터
+        if date_from or date_to:
+            posted_at_str = meta.get("posted_at", "")
+            try:
+                posted_at = datetime.fromisoformat(posted_at_str[:19])
+                if date_from and posted_at < date_from:
+                    continue
+                if date_to and posted_at >= date_to:
+                    continue
+            except (ValueError, TypeError):
+                continue
+
         results.append({
             "post_id": post_id,
             "stock_name": meta.get("stock_name"),
             "stock_code": meta.get("stock_code"),
             "title": meta.get("title"),
             "posted_at": meta.get("posted_at"),
+            "source_type": meta.get("source_type", "community"),
             "bm25_score": round(float(score), 4),
         })
         if len(results) >= top_k:

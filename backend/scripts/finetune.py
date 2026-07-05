@@ -29,8 +29,8 @@ from transformers import (
 
 # ── 설정 ─────────────────────────────────────────────────────────────
 BASE_MODEL   = "snunlp/KR-FinBert-SC"
-DATA_FILE    = Path(__file__).parent / "labeled_data.csv"
-OUTPUT_DIR   = Path(__file__).parent / "finetuned_model"
+DATA_FILE    = Path(__file__).parent.parent / "labeled_data.csv"
+OUTPUT_DIR   = Path(__file__).parent.parent / "finetuned_model"
 MAX_LENGTH   = 256   # 토큰 최대 길이
 EPOCHS       = 3
 BATCH_SIZE   = 16

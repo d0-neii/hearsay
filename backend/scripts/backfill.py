@@ -9,11 +9,11 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import text
-from app.database import SessionLocal
-from app.crawler import fetch_post_detail
+from app.core.database import SessionLocal
+from app.crawler.community import fetch_post_detail
 
 
 # content 비어있는 게시글 하나씩 돌면서 원문 긁어와서 채워줌

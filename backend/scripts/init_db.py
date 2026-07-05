@@ -1,7 +1,12 @@
-from app.database import engine
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from app.core.database import engine
 from sqlalchemy import text
 import app.models  # 모델 임포트해야 Base에 테이블 등록됨
-from app.database import Base
+from app.core.database import Base
 
 
 def init():

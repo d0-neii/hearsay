@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
-from app.database import SessionLocal
+from app.core.database import SessionLocal
 from app.models import Post
 
 # 크롤링할 종목 리스트 (코드: 이름)
@@ -164,24 +164,34 @@ def save_posts(posts: list[dict]) -> int:
 def crawl_all():
     """전체 종목 크롤링 + 감성 분석 파이프라인 실행"""
     from app.sentiment import score_all_posts
+    from app.crawler.news import crawl_news_all
 
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 크롤링 시작...")
     total = 0
 
+    # 종토방 게시글
     for code, name in STOCK_LIST.items():
         posts = fetch_posts(code, name, pages=3)
         saved = save_posts(posts)
         print(f"  {name}({code}): {len(posts)}개 수집, {saved}개 저장")
         total += saved
 
-    print(f"크롤링 완료 — 총 {total}개 저장")
+    print(f"종토방 크롤링 완료 — 총 {total}개 저장")
 
-    # 새로 저장된 게시글 감성 분석
+    # 뉴스 기사
+    news_saved = crawl_news_all()
+    total += news_saved
+
+    # 새로 저장된 게시글/뉴스 감성 분석
     scored = score_all_posts()
     print(f"감성 분석 완료 — {scored}개 채점")
 
+    # 새로 저장된 게시글/뉴스 임베딩
+    from app.embedder import embed_unprocessed_posts
+    embed_unprocessed_posts()
+
     # BM25 인덱스 갱신 (새 게시글 반영)
-    from app.bm25_index import rebuild_index
+    from app.rag.bm25_index import rebuild_index
     rebuild_index()
     print()
 
