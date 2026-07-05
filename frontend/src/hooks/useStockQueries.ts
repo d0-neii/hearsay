@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchStockList, fetchPostFeed, fetchSentimentChart } from '../api/index'
+import { fetchStockList, fetchPostFeed, fetchSentimentChart, fetchDailySummary } from '../api/index'
 
 const STALE_TIME = 1000 * 60 * 5 // 5분
 
@@ -24,6 +24,15 @@ export const useSentimentChart = (stockCode: string | undefined) => {
   return useQuery({
     queryKey: ['sentimentChart', stockCode],
     queryFn: () => fetchSentimentChart(stockCode!),
+    enabled: !!stockCode,
+    staleTime: STALE_TIME,
+  })
+}
+
+export const useDailySummary = (stockCode: string | undefined) => {
+  return useQuery({
+    queryKey: ['dailySummary', stockCode],
+    queryFn: () => fetchDailySummary(stockCode!),
     enabled: !!stockCode,
     staleTime: STALE_TIME,
   })

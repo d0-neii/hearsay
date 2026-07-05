@@ -5,8 +5,9 @@ import {
   postItemSchema,
   sentimentPointSchema,
   askResultSchema,
+  dailySummarySchema,
 } from '../types'
-import type { StockSummary, PostItem, SentimentPoint, AskResult } from '../types'
+import type { StockSummary, PostItem, SentimentPoint, AskResult, DailySummary } from '../types'
 
 const httpClient = axios.create({ baseURL: '/api' })
 
@@ -23,6 +24,11 @@ export const fetchPostFeed = async (stockCode: string): Promise<PostItem[]> => {
 export const fetchSentimentChart = async (stockCode: string): Promise<SentimentPoint[]> => {
   const { data } = await httpClient.get(`/stocks/${stockCode}/timeseries`)
   return z.array(sentimentPointSchema).parse(data)
+}
+
+export const fetchDailySummary = async (stockCode: string): Promise<DailySummary> => {
+  const { data } = await httpClient.get(`/stocks/${stockCode}/daily-summary`)
+  return dailySummarySchema.parse(data)
 }
 
 export const askQuestion = async (query: string, stockCode?: string): Promise<AskResult> => {

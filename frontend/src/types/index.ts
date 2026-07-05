@@ -89,6 +89,14 @@ export const askResultSchema = z.object({
   sources: z.array(askSourceSchema),
 })
 
+export const dailySummarySchema = z.object({
+  items: z.array(z.object({
+    type: z.enum(['이슈', '호재', '악재']),
+    text: z.string(),
+  })),
+  generated_at: z.string(),
+})
+
 // ===== 추론 타입 (스키마의 단일 소스) =====
 
 export type StockSummary = z.infer<typeof stockSummarySchema>
@@ -96,3 +104,4 @@ export type PostItem = z.infer<typeof postItemSchema>
 export type SentimentPoint = z.infer<typeof sentimentPointSchema>
 export type AskResult = z.infer<typeof askResultSchema>
 export type AskSource = z.infer<typeof askSourceSchema>
+export type DailySummary = z.infer<typeof dailySummarySchema>
