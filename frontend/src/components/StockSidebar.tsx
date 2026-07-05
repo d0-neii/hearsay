@@ -75,9 +75,9 @@ export const StockSidebar = ({ stockList, selectedStockCode, onSelectStock }: Pr
                 {stock.avgSentimentScore >= 0 ? '+' : ''}{(stock.avgSentimentScore * 10).toFixed(1)}%
               </span>
             </div>
-            <SentimentMiniBar positiveRatio={stock.positiveRatio} />
-            <span className={`text-[10px] mt-1 block ${sentimentColorClass(stock.positiveRatio >= 50)}`}>
-              {stock.positiveRatio >= 50 ? '매수 우세' : '매도 우세'}
+            <SentimentMiniBar positiveRatio={stock.todayPositiveRatio ?? stock.positiveRatio} />
+            <span className={`text-[10px] mt-1 block ${sentimentColorClass((stock.todayPositiveRatio ?? stock.positiveRatio) >= 50)}`}>
+              {(stock.todayPositiveRatio ?? stock.positiveRatio) >= 50 ? '매수 우세' : '매도 우세'}
             </span>
           </button>
         ))}
