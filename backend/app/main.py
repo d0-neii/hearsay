@@ -261,7 +261,11 @@ def get_timeseries(stock_code: str):
             SELECT
                 DATE_TRUNC('hour', posted_at) as hour,
                 COUNT(*) as count,
-                AVG(sentiment_score) as avg_score
+                -- 조회수 가중 평균: views 없으면 단순 AVG로 폴백
+                CASE WHEN SUM(views) > 0
+                     THEN SUM(sentiment_score * views) / SUM(views)
+                     ELSE AVG(sentiment_score)
+                END as avg_score
             FROM posts
             WHERE stock_code = :code AND posted_at IS NOT NULL
             GROUP BY hour
