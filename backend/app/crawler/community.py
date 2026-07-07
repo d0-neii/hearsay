@@ -115,12 +115,13 @@ def fetch_posts_quick(stock_code: str, stock_name: str) -> list[dict]:
     return posts
 
 
-def fetch_posts(stock_code: str, stock_name: str, pages: int = 3) -> list[dict]:
+def fetch_posts(stock_code: str, stock_name: str, pages: int = 3, sleep: bool = True) -> list[dict]:
     """
-    종토방 게시글 목록 수집 → 각 게시글 상세 페이지 방문해서
-    전체 제목 + 본문 저장.
+    종토방 게시글 목록 수집 → 상세 페이지 병렬 요청으로 전체 제목 + 본문 저장.
+    sleep=True 이면 순차 요청 (정기 크롤링용), False 이면 병렬 요청 (초기 크롤링용).
     """
-    posts = []
+    # 1단계: 목록 페이지에서 기본 정보 수집
+    raw_posts = []
 
     for page in range(1, pages + 1):
         url = f"https://finance.naver.com/item/board.naver?code={stock_code}&page={page}"
@@ -132,9 +133,7 @@ def fetch_posts(stock_code: str, stock_name: str, pages: int = 3) -> list[dict]:
             print(f"[{stock_name}] 페이지 {page} 요청 실패: {e}")
             continue
 
-        rows = soup.select("table.type2 tr")
-
-        for row in rows:
+        for row in soup.select("table.type2 tr"):
             cols = row.select("td")
             if len(cols) < 5:
                 continue
@@ -143,7 +142,6 @@ def fetch_posts(stock_code: str, stock_name: str, pages: int = 3) -> list[dict]:
             if not title_tag:
                 continue
 
-            # 목록 제목 (잘릴 수 있음 — 상세 페이지에서 덮어씀)
             list_title = title_tag.get_text(strip=True)
             href = title_tag.get("href", "")
             source_url = f"https://finance.naver.com{href}" if href else None
@@ -151,17 +149,13 @@ def fetch_posts(stock_code: str, stock_name: str, pages: int = 3) -> list[dict]:
             if not source_url or not list_title:
                 continue
 
-            # 작성자
             author = cols[3].get_text(strip=True)
 
-            # 작성 시각
-            date_str = cols[0].get_text(strip=True)
             try:
-                posted_at = datetime.strptime(date_str, "%Y.%m.%d %H:%M")
+                posted_at = datetime.strptime(cols[0].get_text(strip=True), "%Y.%m.%d %H:%M")
             except ValueError:
                 posted_at = None
 
-            # 조회수 / 좋아요
             try:
                 views = int(cols[2].get_text(strip=True).replace(",", ""))
             except ValueError:
@@ -172,16 +166,10 @@ def fetch_posts(stock_code: str, stock_name: str, pages: int = 3) -> list[dict]:
             except ValueError:
                 likes = 0
 
-            # 개별 게시글 페이지 → 전체 제목 + 본문
-            detail = fetch_post_detail(source_url)
-            full_title = detail["title"] or list_title  # 실패 시 목록 제목으로 폴백
-            content = detail["content"]
-
-            posts.append({
+            raw_posts.append({
                 "stock_code": stock_code,
                 "stock_name": stock_name,
-                "title": full_title,
-                "content": content,
+                "list_title": list_title,
                 "author": author,
                 "views": views,
                 "likes": likes,
@@ -189,7 +177,34 @@ def fetch_posts(stock_code: str, stock_name: str, pages: int = 3) -> list[dict]:
                 "posted_at": posted_at,
             })
 
-            time.sleep(0.3)  # 네이버 서버 부하 방지
+    # 2단계: 상세 요청 (순차 or 병렬)
+    if sleep:
+        # 정기 크롤링 — 순차 + sleep (네이버 서버 부하 방지)
+        details = []
+        for p in raw_posts:
+            details.append(fetch_post_detail(p["source_url"]))
+            time.sleep(0.3)
+    else:
+        # 초기 크롤링 — ThreadPoolExecutor로 병렬 요청
+        from concurrent.futures import ThreadPoolExecutor
+        urls = [p["source_url"] for p in raw_posts]
+        with ThreadPoolExecutor(max_workers=10) as ex:
+            details = list(ex.map(fetch_post_detail, urls))
+
+    # 3단계: 목록 정보 + 상세 정보 합치기
+    posts = []
+    for p, detail in zip(raw_posts, details):
+        posts.append({
+            "stock_code": p["stock_code"],
+            "stock_name": p["stock_name"],
+            "title": detail["title"] or p["list_title"],
+            "content": detail["content"],
+            "author": p["author"],
+            "views": p["views"],
+            "likes": p["likes"],
+            "source_url": p["source_url"],
+            "posted_at": p["posted_at"],
+        })
 
     return posts
 
@@ -228,6 +243,27 @@ def get_stock_list() -> dict[str, str]:
     except Exception as e:
         print(f"[경고] DB에서 종목 목록 로드 실패, 하드코딩 사용: {e}")
     return STOCK_LIST
+
+
+def crawl_quick_all():
+    """서버 시작 시 초기 크롤링 — 2페이지, sleep 없이 본문까지 수집"""
+    from app.sentiment import score_all_posts
+
+    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 초기 크롤링 시작...")
+    total = 0
+
+    stock_list = get_stock_list()
+
+    for code, name in stock_list.items():
+        posts = fetch_posts(code, name, pages=2, sleep=False)
+        saved = save_posts(posts)
+        print(f"  {name}({code}): {len(posts)}개 수집, {saved}개 저장")
+        total += saved
+
+    print(f"초기 크롤링 완료 — 총 {total}개 저장")
+
+    scored = score_all_posts()
+    print(f"감성 분석 완료 — {scored}개 채점\n")
 
 
 def crawl_all():

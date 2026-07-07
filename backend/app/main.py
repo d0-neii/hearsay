@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.crawler import crawl_all
+from app.crawler.community import crawl_quick_all
 from app.api.routes import api_router
 
 _scheduler = BackgroundScheduler(timezone="Asia/Seoul")
@@ -36,9 +37,14 @@ async def lifespan(app: FastAPI):
     from app.rag.bm25_index import rebuild_index
     rebuild_index()
 
+    # 서버 시작 시 빠른 초기 크롤링 (백그라운드)
+    import threading
+    threading.Thread(target=crawl_quick_all, daemon=True).start()
+    print("초기 빠른 크롤링 시작 (백그라운드)...")
+
     _scheduler.add_job(crawl_all, "interval", minutes=10)
     _scheduler.start()
-    print("스케줄러 시작 — 즉시 크롤링 후 10분마다 반복합니다.")
+    print("스케줄러 시작 — 10분마다 전체 크롤링 반복합니다.")
     yield
     _scheduler.shutdown()
     print("스케줄러 종료.")
