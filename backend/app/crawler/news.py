@@ -6,7 +6,7 @@ from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 from app.core.database import SessionLocal
 from app.models import Post
-from app.crawler.community import STOCK_LIST, HEADERS
+from app.crawler.community import STOCK_LIST, HEADERS, get_stock_list
 
 
 def _parse_date(date_str: str) -> datetime | None:
@@ -114,7 +114,7 @@ def crawl_news_all():
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 뉴스 크롤링 시작...")
     total = 0
 
-    for code, name in STOCK_LIST.items():
+    for code, name in get_stock_list().items():
         news = fetch_news(code, name, pages=2)
         saved = save_news(news)
         print(f"  {name}({code}): {len(news)}개 수집, {saved}개 저장")

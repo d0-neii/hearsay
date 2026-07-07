@@ -62,6 +62,59 @@ def fetch_post_detail(source_url: str) -> dict:
         return {"title": None, "content": None}
 
 
+def fetch_posts_quick(stock_code: str, stock_name: str) -> list[dict]:
+    """
+    빠른 초기 수집용 — 1페이지만, 상세 요청 없이 목록 제목만 사용.
+    종목 추가 시 즉시 호출용.
+    """
+    posts = []
+    url = f"https://finance.naver.com/item/board.naver?code={stock_code}&page=1"
+    try:
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        soup = BeautifulSoup(res.content, "html.parser", from_encoding="euc-kr")
+    except Exception as e:
+        print(f"[{stock_name}] 빠른 수집 실패: {e}")
+        return posts
+
+    for row in soup.select("table.type2 tr"):
+        cols = row.select("td")
+        if len(cols) < 5:
+            continue
+        title_tag = cols[1].select_one("a")
+        if not title_tag:
+            continue
+        list_title = title_tag.get_text(strip=True)
+        href = title_tag.get("href", "")
+        source_url = f"https://finance.naver.com{href}" if href else None
+        if not source_url or not list_title:
+            continue
+        author = cols[3].get_text(strip=True)
+        try:
+            posted_at = datetime.strptime(cols[0].get_text(strip=True), "%Y.%m.%d %H:%M")
+        except ValueError:
+            posted_at = None
+        try:
+            views = int(cols[2].get_text(strip=True).replace(",", ""))
+        except ValueError:
+            views = 0
+        try:
+            likes = int(cols[4].get_text(strip=True).replace(",", ""))
+        except ValueError:
+            likes = 0
+        posts.append({
+            "stock_code": stock_code,
+            "stock_name": stock_name,
+            "title": list_title,
+            "content": None,
+            "author": author,
+            "views": views,
+            "likes": likes,
+            "source_url": source_url,
+            "posted_at": posted_at,
+        })
+    return posts
+
+
 def fetch_posts(stock_code: str, stock_name: str, pages: int = 3) -> list[dict]:
     """
     종토방 게시글 목록 수집 → 각 게시글 상세 페이지 방문해서
@@ -161,6 +214,22 @@ def save_posts(posts: list[dict]) -> int:
     return saved
 
 
+def get_stock_list() -> dict[str, str]:
+    """DB에서 종목 목록을 읽어 {code: name} 딕셔너리 반환. DB 연결 실패 시 하드코딩 폴백."""
+    try:
+        from app.models.stock import Stock
+        db = SessionLocal()
+        try:
+            stocks = db.query(Stock).all()
+            if stocks:
+                return {s.stock_code: s.stock_name for s in stocks}
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[경고] DB에서 종목 목록 로드 실패, 하드코딩 사용: {e}")
+    return STOCK_LIST
+
+
 def crawl_all():
     """전체 종목 크롤링 + 감성 분석 파이프라인 실행"""
     from app.sentiment import score_all_posts
@@ -169,8 +238,10 @@ def crawl_all():
     print(f"\n[{datetime.now().strftime('%H:%M:%S')}] 크롤링 시작...")
     total = 0
 
+    stock_list = get_stock_list()
+
     # 종토방 게시글
-    for code, name in STOCK_LIST.items():
+    for code, name in stock_list.items():
         posts = fetch_posts(code, name, pages=3)
         saved = save_posts(posts)
         print(f"  {name}({code}): {len(posts)}개 수집, {saved}개 저장")

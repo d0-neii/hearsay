@@ -21,30 +21,31 @@ def get_stocks():
     """종목별 통계 (게시글 수, 감성 비율, 어제 대비, 언급량 비교, 핫키워드)"""
     db = SessionLocal()
     try:
-        # 1. 종목별 통계 집계 — 오늘/어제/7일 분리
+        # 1. 종목별 통계 집계 — stocks LEFT JOIN posts (게시글 없는 종목도 포함)
         result = db.execute(text("""
             SELECT
-                stock_code,
-                stock_name,
-                COUNT(*) as total,
-                SUM(CASE WHEN sentiment_score > 0.1 THEN 1 ELSE 0 END) as positive,
-                SUM(CASE WHEN sentiment_score < -0.1 THEN 1 ELSE 0 END) as negative,
-                AVG(sentiment_score) as avg_score,
+                s.stock_code,
+                s.stock_name,
+                COUNT(p.id) as total,
+                SUM(CASE WHEN p.sentiment_score > 0.1 THEN 1 ELSE 0 END) as positive,
+                SUM(CASE WHEN p.sentiment_score < -0.1 THEN 1 ELSE 0 END) as negative,
+                AVG(p.sentiment_score) as avg_score,
                 -- 오늘
-                SUM(CASE WHEN DATE(posted_at) = CURRENT_DATE THEN 1 ELSE 0 END)
+                SUM(CASE WHEN DATE(p.posted_at) = CURRENT_DATE THEN 1 ELSE 0 END)
                     as today_total,
-                SUM(CASE WHEN DATE(posted_at) = CURRENT_DATE AND sentiment_score > 0.1 THEN 1 ELSE 0 END)
+                SUM(CASE WHEN DATE(p.posted_at) = CURRENT_DATE AND p.sentiment_score > 0.1 THEN 1 ELSE 0 END)
                     as today_positive,
                 -- 어제
-                SUM(CASE WHEN DATE(posted_at) = CURRENT_DATE - INTERVAL '1 day' THEN 1 ELSE 0 END)
+                SUM(CASE WHEN DATE(p.posted_at) = CURRENT_DATE - INTERVAL '1 day' THEN 1 ELSE 0 END)
                     as yesterday_total,
-                SUM(CASE WHEN DATE(posted_at) = CURRENT_DATE - INTERVAL '1 day' AND sentiment_score > 0.1 THEN 1 ELSE 0 END)
+                SUM(CASE WHEN DATE(p.posted_at) = CURRENT_DATE - INTERVAL '1 day' AND p.sentiment_score > 0.1 THEN 1 ELSE 0 END)
                     as yesterday_positive,
                 -- 최근 7일(오늘 제외) 합계 — 일평균 계산용
-                SUM(CASE WHEN DATE(posted_at) >= CURRENT_DATE - INTERVAL '7 days' AND DATE(posted_at) < CURRENT_DATE THEN 1 ELSE 0 END)
+                SUM(CASE WHEN DATE(p.posted_at) >= CURRENT_DATE - INTERVAL '7 days' AND DATE(p.posted_at) < CURRENT_DATE THEN 1 ELSE 0 END)
                     as week_total
-            FROM posts
-            GROUP BY stock_code, stock_name
+            FROM stocks s
+            LEFT JOIN posts p ON p.stock_code = s.stock_code
+            GROUP BY s.stock_code, s.stock_name
             ORDER BY today_total DESC NULLS LAST, total DESC
         """))
         rows = result.fetchall()

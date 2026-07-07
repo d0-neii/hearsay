@@ -1,3 +1,3 @@
-from .community import crawl_all, STOCK_LIST, HEADERS
+from .community import crawl_all, STOCK_LIST, HEADERS, get_stock_list
 
-__all__ = ["crawl_all", "STOCK_LIST", "HEADERS"]
+__all__ = ["crawl_all", "STOCK_LIST", "HEADERS", "get_stock_list"]
