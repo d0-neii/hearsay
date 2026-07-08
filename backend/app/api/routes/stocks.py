@@ -9,6 +9,7 @@ import os
 
 from app.core.database import SessionLocal
 from app.api.keywords import extract_hot_keyword
+from app.crawler.trading import get_buy_sell_ratio
 
 load_dotenv()
 _openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -198,3 +199,22 @@ def get_timeseries(stock_code: str):
         ]
     finally:
         db.close()
+
+
+@router.get("/stocks/{stock_code}/trading")
+def get_trading(stock_code: str):
+    """
+    오늘의 실제 매수/매도 비율 (KRX 투자자별 거래금액 기반).
+
+    개인·기관합계·외국인합계 세 그룹 중 순매수 우세인 그룹의 비율을 buy_ratio로 반환.
+    pykrx 연결 실패 또는 데이터 없는 경우 null 반환.
+    """
+    result = get_buy_sell_ratio(stock_code)
+    if result is None:
+        return {
+            "buy_ratio": None,
+            "sell_ratio": None,
+            "detail": None,
+            "date": None,
+        }
+    return result

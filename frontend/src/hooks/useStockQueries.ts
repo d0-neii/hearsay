@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchStockList, fetchPostFeed, fetchSentimentChart, fetchDailySummary, searchStocks } from '../api/index'
+import { fetchStockList, fetchPostFeed, fetchSentimentChart, fetchDailySummary, searchStocks, fetchTradingData } from '../api/index'
 
 const STALE_TIME = 1000 * 60 * 5 // 5분
 
@@ -35,6 +35,15 @@ export const useDailySummary = (stockCode: string | undefined) => {
     queryFn: () => fetchDailySummary(stockCode!),
     enabled: !!stockCode,
     staleTime: STALE_TIME,
+  })
+}
+
+export const useTradingData = (stockCode: string | undefined) => {
+  return useQuery({
+    queryKey: ['tradingData', stockCode],
+    queryFn: () => fetchTradingData(stockCode!),
+    enabled: !!stockCode,
+    staleTime: 1000 * 60 * 30, // 30분 (장중 변동 반영 주기)
   })
 }
 

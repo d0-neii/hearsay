@@ -105,3 +105,21 @@ export type SentimentPoint = z.infer<typeof sentimentPointSchema>
 export type AskResult = z.infer<typeof askResultSchema>
 export type AskSource = z.infer<typeof askSourceSchema>
 export type DailySummary = z.infer<typeof dailySummarySchema>
+
+// ===== 실제 매수/매도 거래 비율 (KRX 투자자별 데이터) =====
+
+export const tradingDataSchema = z
+  .object({
+    buy_ratio: z.number().nullable(),
+    sell_ratio: z.number().nullable(),
+    detail: z.record(z.string(), z.number()).nullable().optional(),
+    date: z.string().nullable(),
+  })
+  .transform((raw) => ({
+    buyRatio: raw.buy_ratio,
+    sellRatio: raw.sell_ratio,
+    detail: raw.detail ?? null,  // 예: { "개인": 1200000000, "기관합계": -800000000 }
+    date: raw.date,
+  }))
+
+export type TradingData = z.infer<typeof tradingDataSchema>

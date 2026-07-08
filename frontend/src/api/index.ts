@@ -6,8 +6,9 @@ import {
   sentimentPointSchema,
   askResultSchema,
   dailySummarySchema,
+  tradingDataSchema,
 } from '../types'
-import type { StockSummary, PostItem, SentimentPoint, AskResult, DailySummary } from '../types'
+import type { StockSummary, PostItem, SentimentPoint, AskResult, DailySummary, TradingData } from '../types'
 
 const httpClient = axios.create({ baseURL: '/api' })
 
@@ -44,6 +45,11 @@ export const addStock = async (stock_code: string, stock_name: string): Promise<
 
 export const deleteStock = async (stock_code: string): Promise<void> => {
   await httpClient.delete(`/stocks/manage/${stock_code}`)
+}
+
+export const fetchTradingData = async (stockCode: string): Promise<TradingData> => {
+  const { data } = await httpClient.get(`/stocks/${stockCode}/trading`)
+  return tradingDataSchema.parse(data)
 }
 
 export const askQuestion = async (query: string, stockCode?: string): Promise<AskResult> => {

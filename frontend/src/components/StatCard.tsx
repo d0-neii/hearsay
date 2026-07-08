@@ -1,4 +1,4 @@
-import type { StockSummary, AskResult } from '../types'
+import type { StockSummary, TradingData } from '../types'
 
 type Props = {
   label: string
@@ -34,35 +34,53 @@ type CardValue = Omit<Props, 'label'>
 
 type CardDefinition = {
   label: string
-  compute: (stock: StockSummary, askResult: AskResult | undefined) => CardValue
+  compute: (stock: StockSummary, tradingData: TradingData | undefined) => CardValue
 }
 
-// 매도면 비율을 뒤집어서 "매도 비율"로 표시 (예: 긍정 30% → 매도 70%)
-const toDisplayRatio = (ratio: number, isMaedo: boolean) => Math.round(isMaedo ? 100 - ratio : ratio)
+/** 개인/기관/외국인 순매수 방향을 한 줄 텍스트로 요약 */
+const buildTradingSubText = (detail: Record<string, number> | null): string | undefined =>
+  detail
+    ? Object.entries(detail)
+        .map(([investor, net]) => `${investor.replace('합계', '')}${net > 0 ? '↑' : '↓'}`)
+        .join('  ')
+    : undefined
 
 const STAT_CARD_DEFINITIONS: CardDefinition[] = [
   {
+    label: '수급',
+    compute: (_stock, tradingData) => {
+      // KRX 실제 거래 데이터가 있으면 사용
+      if (tradingData?.buyRatio != null) {
+        const isSell = tradingData.buyRatio < 50
+        const ratio = isSell ? tradingData.sellRatio! : tradingData.buyRatio
+        return {
+          value: `${isSell ? '매도' : '매수'} ${ratio}%`,
+          valueClassName: isSell ? 'text-negative' : 'text-positive',
+          sub: buildTradingSubText(tradingData.detail),
+          subClassName: 'text-muted',
+        }
+      }
+
+      // 데이터 없음 (장외시간 or pykrx 오류)
+      return {
+        value: '—',
+        sub: '장 마감 후 제공',
+        subClassName: 'text-muted',
+      }
+    },
+  },
+  {
     label: '여론',
     compute: (stock) => {
-      const todayRatio = stock.todayPositiveRatio ?? stock.positiveRatio
-      const isMaedo = todayRatio < 50
-      const displayRatio = toDisplayRatio(todayRatio, isMaedo)
-
-      const delta =
-        stock.prevPositiveRatio !== null
-          ? displayRatio - toDisplayRatio(stock.prevPositiveRatio, isMaedo)
-          : null
-      const deltaText = delta !== null ? `어제 대비 ${delta >= 0 ? '+' : ''}${delta}%` : undefined
-
-      // 매도면 delta<0, 매수면 delta>0일 때가 좋은 신호(초록)
-      const isGoodDelta = delta !== null && (isMaedo ? delta < 0 : delta > 0)
-      const deltaColor = !delta ? 'text-muted' : isGoodDelta ? 'text-positive' : 'text-negative'
-
+      // 커뮤니티 감성 비율 (긍정 게시글 비율)
+      const ratio = Math.round(stock.todayPositiveRatio ?? stock.positiveRatio)
+      const isMaedo = ratio < 50
+      const displayRatio = isMaedo ? 100 - ratio : ratio
       return {
-        value: `${isMaedo ? '매도' : '매수'} ${displayRatio}%`,
+        value: `${isMaedo ? '부정' : '긍정'} ${displayRatio}%`,
         valueClassName: isMaedo ? 'text-negative' : 'text-positive',
-        sub: deltaText,
-        subClassName: deltaColor,
+        sub: '커뮤니티 감성',
+        subClassName: 'text-muted',
       }
     },
   },
@@ -79,27 +97,17 @@ const STAT_CARD_DEFINITIONS: CardDefinition[] = [
       value: stock.hotKeyword ?? '—',
     }),
   },
-  {
-    label: '분석 근거',
-    compute: (_stock, askResult) => {
-      const sourceCount = askResult?.sources.length
-      return {
-        value: sourceCount !== undefined ? `${sourceCount}개` : '—',
-        sub: sourceCount !== undefined ? '참고 게시글' : '질문 후 표시',
-      }
-    },
-  },
 ]
 
 type StatCardsProps = {
   stock: StockSummary
-  askResult: AskResult | undefined
+  tradingData: TradingData | undefined
 }
 
-export const StatCards = ({ stock, askResult }: StatCardsProps) => (
+export const StatCards = ({ stock, tradingData }: StatCardsProps) => (
   <div className="grid grid-cols-4 gap-3">
     {STAT_CARD_DEFINITIONS.map(({ label, compute }) => (
-      <StatCard key={label} label={label} {...compute(stock, askResult)} />
+      <StatCard key={label} label={label} {...compute(stock, tradingData)} />
     ))}
   </div>
 )

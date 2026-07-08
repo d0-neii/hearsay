@@ -5,7 +5,7 @@ import { StatCards } from './components/StatCard'
 import { PostFeed } from './components/PostFeed'
 import { AskPanel } from './components/AskPanel'
 import { DailySummary } from './components/DailySummary'
-import { useStockList, usePostFeed, useSentimentChart, useDailySummary } from './hooks/useStockQueries'
+import { useStockList, usePostFeed, useSentimentChart, useDailySummary, useTradingData } from './hooks/useStockQueries'
 import { useAskQuestion } from './hooks/useAskQuestion'
 import type { StockSummary } from './types'
 
@@ -20,15 +20,17 @@ export default function App() {
   const { data: postFeed = [] } = usePostFeed(selectedStock?.stockCode)
   const { data: sentimentChartData = [] } = useSentimentChart(selectedStock?.stockCode)
   const { data: dailySummary, isLoading: isDailySummaryLoading } = useDailySummary(selectedStock?.stockCode)
+  const { data: tradingData } = useTradingData(selectedStock?.stockCode)
   const { mutate: askQuestion, isPending: isAsking, data: askResult, reset: resetAsk } = useAskQuestion(selectedStock?.stockCode)
 
   useEffect(() => {
     resetAsk()
   }, [selectedStock?.stockCode, resetAsk])
 
-  const positiveRatio = selectedStock
-    ? Math.round(selectedStock.todayPositiveRatio ?? selectedStock.positiveRatio)
-    : 50
+  // 실제 KRX 매수/매도 비율 우선 사용, 없으면 커뮤니티 감성 비율로 fallback
+  const buyRatio = tradingData?.buyRatio
+    ?? (selectedStock ? Math.round(selectedStock.todayPositiveRatio ?? selectedStock.positiveRatio) : 50)
+  const sellRatio = 100 - buyRatio
 
   return (
     <div className="grid grid-cols-[220px_1fr_300px] h-screen overflow-hidden">
@@ -59,23 +61,26 @@ export default function App() {
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-center gap-2 text-sm font-semibold">
-                <span className="text-positive">{positiveRatio}% 매수</span>
+                <span className="text-positive">{buyRatio}% 매수</span>
                 <span className="text-border-strong">|</span>
-                <span className="text-negative">매도 {100 - positiveRatio}%</span>
+                <span className="text-negative">매도 {sellRatio}%</span>
+                {tradingData?.buyRatio == null && (
+                  <span className="text-[10px] font-normal text-muted">(커뮤니티 추정)</span>
+                )}
               </div>
               <div className="flex h-2 rounded-full border border-border overflow-hidden">
                 {/* 매수: 오른쪽 정렬 (중심 방향) */}
                 <div className="flex-1 overflow-hidden flex justify-end">
                   <div
                     className="h-full bg-positive-bar transition-[width] duration-[400ms] ease-in-out"
-                    style={{ width: `${Math.min(positiveRatio * 2, 100)}%` }}
+                    style={{ width: `${Math.min(buyRatio * 2, 100)}%` }}
                   />
                 </div>
                 {/* 매도: 왼쪽 정렬 (중심 방향) */}
                 <div className="flex-1 overflow-hidden flex justify-start">
                   <div
                     className="h-full bg-negative-bar transition-[width] duration-[400ms] ease-in-out"
-                    style={{ width: `${Math.min((100 - positiveRatio) * 2, 100)}%` }}
+                    style={{ width: `${Math.min(sellRatio * 2, 100)}%` }}
                   />
                 </div>
               </div>
@@ -83,7 +88,7 @@ export default function App() {
 
             <DailySummary data={dailySummary} isLoading={isDailySummaryLoading} />
 
-            <StatCards stock={selectedStock} askResult={askResult} />
+            <StatCards stock={selectedStock} tradingData={tradingData} />
 
             {sentimentChartData.length > 0 && (
               <SentimentChart data={sentimentChartData} />
