@@ -3,6 +3,9 @@ import type { StockSummary } from '../types'
 import Logo from '../assets/logo.svg?react'
 import SearchIcon from '../assets/icons/search.svg?react'
 import ClearIcon from '../assets/icons/clear.svg?react'
+import { AddStockView } from './AddStockView'
+
+type SidebarView = 'list' | 'add'
 
 type Props = {
   stockList: StockSummary[]
@@ -20,7 +23,16 @@ const SentimentMiniBar = ({ positiveRatio }: { positiveRatio: number }) => (
 const sentimentColorClass = (isPositive: boolean) => (isPositive ? 'text-positive-bar' : 'text-negative-bar')
 
 export const StockSidebar = ({ stockList, selectedStockCode, onSelectStock }: Props) => {
+  const [view, setView] = useState<SidebarView>('list')
   const [searchKeyword, setSearchKeyword] = useState('')
+
+  if (view === 'add') {
+    return (
+      <aside className="bg-sidebar flex flex-col overflow-hidden">
+        <AddStockView stockList={stockList} onBack={() => setView('list')} />
+      </aside>
+    )
+  }
 
   const trimmedSearchKeyword = searchKeyword.trim()
   const filteredStockList = trimmedSearchKeyword
@@ -47,7 +59,7 @@ export const StockSidebar = ({ stockList, selectedStockCode, onSelectStock }: Pr
           className="bg-transparent outline-none w-full text-sidebar-fg placeholder:text-sidebar-muted"
         />
         {searchKeyword && (
-          <button onClick={() => setSearchKeyword('')} className="shrink-0 hover:text-sidebar-fg transition-colors">
+          <button onClick={() => setSearchKeyword('')} className="shrink-0 hover:text-sidebar-fg transition-colors cursor-pointer">
             <ClearIcon className="w-3 h-3" />
           </button>
         )}
@@ -57,7 +69,7 @@ export const StockSidebar = ({ stockList, selectedStockCode, onSelectStock }: Pr
         {trimmedSearchKeyword ? `검색 결과 ${filteredStockList.length}건` : '인기 종목'}
       </p>
 
-      <div className="flex flex-col gap-0.5 px-2">
+      <div className="flex flex-col gap-0.5 px-2 flex-1">
         {filteredStockList.length === 0 && (
           <p className="p-4 text-center text-[12px] text-sidebar-muted">종목을 찾을 수 없어요</p>
         )}
@@ -81,6 +93,18 @@ export const StockSidebar = ({ stockList, selectedStockCode, onSelectStock }: Pr
             </span>
           </button>
         ))}
+      </div>
+
+      {/* 종목 추가 버튼 */}
+      <div className="px-3 py-3">
+        <button
+          onClick={() => setView('add')}
+          className="w-full py-3
+           rounded-md border border-dashed border-sidebar-muted text-sidebar-fg text-xs flex items-center justify-center gap-1.5 hover:border-sidebar-fg hover:bg-sidebar-hover transition-colors cursor-pointer"
+        >
+          <span className="text-base leading-none">+</span>
+          종목 추가
+        </button>
       </div>
     </aside>
   )
