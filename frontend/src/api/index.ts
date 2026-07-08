@@ -31,6 +31,21 @@ export const fetchDailySummary = async (stockCode: string): Promise<DailySummary
   return dailySummarySchema.parse(data)
 }
 
+export type StockSearchResult = { stock_code: string; stock_name: string }
+
+export const searchStocks = async (q: string): Promise<StockSearchResult[]> => {
+  const { data } = await httpClient.get('/stocks/search', { params: { q } })
+  return data
+}
+
+export const addStock = async (stock_code: string, stock_name: string): Promise<void> => {
+  await httpClient.post('/stocks/manage', { stock_code, stock_name })
+}
+
+export const deleteStock = async (stock_code: string): Promise<void> => {
+  await httpClient.delete(`/stocks/manage/${stock_code}`)
+}
+
 export const askQuestion = async (query: string, stockCode?: string): Promise<AskResult> => {
   const { data } = await httpClient.post('/ask', {
     query,
