@@ -1,12 +1,55 @@
 import re
 from datetime import datetime, timedelta
 from sqlalchemy import text
+from openai import OpenAI
+from dotenv import load_dotenv
+import os
 from app.core.database import SessionLocal
 from app.embedder import get_embedding
 from .bm25_index import search as bm25_search
 
+load_dotenv()
+_openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 # RRF 상수: 순위 충격 완화용
 _RRF_K = 60
+
+
+def _generate_hypothetical_document(query: str) -> str:
+    """
+    HyDE (Hypothetical Document Embeddings):
+    사용자 쿼리를 받아 실제로 DB에 있을 법한 게시글 제목을 LLM으로 생성.
+
+    일반 쿼리 임베딩 대신 이 가상 문서를 임베딩해서 벡터 검색에 사용하면,
+    쿼리(짧고 추상적) vs 문서(구체적 제목) 간 분포 차이를 줄일 수 있다.
+
+    예) "삼성전자 요즘 분위기 어때?" →
+        "삼성전자, 반도체 수요 회복 기대감에 커뮤니티 긍정 여론 증가"
+    """
+    try:
+        response = _openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=80,
+            temperature=0,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "당신은 주식 커뮤니티 게시글 제목을 작성하는 봇입니다. "
+                        "사용자 질문을 받으면, 그 질문에 대한 답이 담겼을 법한 "
+                        "실제 커뮤니티 게시글 제목을 딱 한 줄만 출력하세요. "
+                        "다른 말은 절대 하지 마세요."
+                    ),
+                },
+                {"role": "user", "content": query},
+            ],
+        )
+        hypothetical = response.choices[0].message.content.strip()
+        print(f"[HyDE] '{query}' → '{hypothetical}'")
+        return hypothetical
+    except Exception as e:
+        print(f"[HyDE] 가상 문서 생성 실패, 원본 쿼리 사용: {e}")
+        return query
 
 
 def _parse_date_range(query: str) -> tuple[datetime | None, datetime | None]:
@@ -46,8 +89,11 @@ def _vector_search(
     date_from: datetime | None = None,
     date_to: datetime | None = None,
 ) -> list[dict]:
-    """벡터 유사도 기반 검색. 거리(distance) 오름차순 top_k 반환."""
-    query_vector = get_embedding(query)
+    """벡터 유사도 기반 검색. 거리(distance) 오름차순 top_k 반환.
+    HyDE: 쿼리 → 가상 문서 생성 → 가상 문서 임베딩으로 검색.
+    """
+    hypothetical_doc = _generate_hypothetical_document(query)
+    query_vector = get_embedding(hypothetical_doc)
     db = SessionLocal()
     try:
         # 날짜 필터 조건 동적 생성
@@ -153,7 +199,7 @@ def search_similar_posts(query: str, stock_code: str = None, top_k: int = 5) -> 
     Hybrid Search (BM25 + Vector) + RRF 기반 유사 게시글 검색.
 
     1. 쿼리에서 날짜 의도 파싱 (오늘/어제/이번주 등)
-    2. 벡터 검색으로 후보 top-20 추출
+    2. HyDE로 가상 문서 생성 후 벡터 검색 후보 top-20 추출
     3. BM25 검색으로 후보 top-20 추출
     4. RRF로 두 결과 합산 → 최종 top_k 반환
     """
