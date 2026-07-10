@@ -13,7 +13,7 @@ type ChatMessage = { question: string; answer: string }
 
 export default function App() {
   const [manuallySelectedStock, setManuallySelectedStock] = useState<StockSummary | null>(null)
-  const [chatHistories, setChatHistories] = useState<Map<string, ChatMessage[]>>(new Map())
+  const [messages, setMessages] = useState<ChatMessage[]>([])
 
   const { data: stockList = [], isLoading: isStockListLoading, isError: isStockListError } = useStockList()
 
@@ -26,25 +26,18 @@ export default function App() {
   const { data: tradingData } = useTradingData(selectedStock?.stockCode)
   const { mutate: askQuestionMutate, isPending: isAsking, reset: resetAsk } = useAskQuestion(selectedStock?.stockCode)
 
-  const currentMessages = (selectedStock ? chatHistories.get(selectedStock.stockCode) : undefined) ?? []
-
   const handleAskQuestion = (query: string) => {
     if (!selectedStock) return
     askQuestionMutate(query, {
       onSuccess: (result) => {
-        const stockCode = selectedStock.stockCode
-        setChatHistories((prev) => {
-          const next = new Map(prev)
-          const history = next.get(stockCode) ?? []
-          next.set(stockCode, [...history, { question: query, answer: result.answer }])
-          return next
-        })
+        setMessages((prev) => [...prev, { question: query, answer: result.answer }])
       },
     })
   }
 
   useEffect(() => {
     resetAsk()
+    setMessages([])
   }, [selectedStock?.stockCode, resetAsk])
 
   // 실제 KRX 매수/매도 비율 우선 사용, 없으면 커뮤니티 감성 비율로 fallback
@@ -116,7 +109,7 @@ export default function App() {
 
             <AskPanel
               isAsking={isAsking}
-              messages={currentMessages}
+              messages={messages}
               onAskQuestion={handleAskQuestion}
             />
           </>
