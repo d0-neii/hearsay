@@ -1,26 +1,28 @@
 import { useState } from 'react'
-import type { AskResult } from '../types'
+
+type ChatMessage = { question: string; answer: string }
 
 type Props = {
   isAsking: boolean
-  askResult: AskResult | undefined
+  messages: ChatMessage[]
   onAskQuestion: (query: string) => void
 }
 
 const QUICK_QUERIES = ['오늘 왜 올랐어?', '실적 이후 반응은?', '지금 분위기 어때?']
 
-export const AskPanel = ({ isAsking, askResult, onAskQuestion }: Props) => {
+export const AskPanel = ({ isAsking, messages, onAskQuestion }: Props) => {
   const [inputQuery, setInputQuery] = useState('')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!inputQuery.trim()) return
     onAskQuestion(inputQuery)
+    setInputQuery('')
   }
 
   const handleQuickQuery = (query: string) => {
-    setInputQuery(query)
     onAskQuestion(query)
+    setInputQuery('')
   }
 
   return (
@@ -56,9 +58,30 @@ export const AskPanel = ({ isAsking, askResult, onAskQuestion }: Props) => {
         </button>
       </form>
 
-      {askResult && (
-        <div className="bg-base rounded-md px-4 py-3.5 border-l-[3px] border-l-primary">
-          <p className="text-[13px] leading-[1.7] text-primary">{askResult.answer}</p>
+      {messages.length > 0 && (
+        <div className="flex flex-col gap-3">
+          {messages.map((msg, i) => (
+            <div key={i} className="flex flex-col gap-1.5">
+              <p className="text-[12px] text-muted font-medium">Q. {msg.question}</p>
+              <div className="bg-base rounded-md px-4 py-3.5 border-l-[3px] border-l-primary">
+                <p className="text-[13px] leading-[1.7] text-primary">{msg.answer}</p>
+              </div>
+            </div>
+          ))}
+          {isAsking && (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[12px] text-muted font-medium">Q. {inputQuery || '...'}</p>
+              <div className="bg-base rounded-md px-4 py-3.5 border-l-[3px] border-l-primary opacity-50">
+                <p className="text-[13px] text-muted">분석 중...</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {messages.length === 0 && isAsking && (
+        <div className="bg-base rounded-md px-4 py-3.5 border-l-[3px] border-l-primary opacity-50">
+          <p className="text-[13px] text-muted">분석 중...</p>
         </div>
       )}
     </div>

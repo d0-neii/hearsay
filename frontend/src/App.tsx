@@ -9,8 +9,11 @@ import { useStockList, usePostFeed, useSentimentChart, useDailySummary, useTradi
 import { useAskQuestion } from './hooks/useAskQuestion'
 import type { StockSummary } from './types'
 
+type ChatMessage = { question: string; answer: string }
+
 export default function App() {
   const [manuallySelectedStock, setManuallySelectedStock] = useState<StockSummary | null>(null)
+  const [chatHistories, setChatHistories] = useState<Map<string, ChatMessage[]>>(new Map())
 
   const { data: stockList = [], isLoading: isStockListLoading, isError: isStockListError } = useStockList()
 
@@ -21,7 +24,24 @@ export default function App() {
   const { data: sentimentChartData = [] } = useSentimentChart(selectedStock?.stockCode)
   const { data: dailySummary, isLoading: isDailySummaryLoading } = useDailySummary(selectedStock?.stockCode)
   const { data: tradingData } = useTradingData(selectedStock?.stockCode)
-  const { mutate: askQuestion, isPending: isAsking, data: askResult, reset: resetAsk } = useAskQuestion(selectedStock?.stockCode)
+  const { mutate: askQuestionMutate, isPending: isAsking, reset: resetAsk } = useAskQuestion(selectedStock?.stockCode)
+
+  const currentMessages = (selectedStock ? chatHistories.get(selectedStock.stockCode) : undefined) ?? []
+
+  const handleAskQuestion = (query: string) => {
+    if (!selectedStock) return
+    askQuestionMutate(query, {
+      onSuccess: (result) => {
+        const stockCode = selectedStock.stockCode
+        setChatHistories((prev) => {
+          const next = new Map(prev)
+          const history = next.get(stockCode) ?? []
+          next.set(stockCode, [...history, { question: query, answer: result.answer }])
+          return next
+        })
+      },
+    })
+  }
 
   useEffect(() => {
     resetAsk()
@@ -95,10 +115,9 @@ export default function App() {
             )}
 
             <AskPanel
-              key={selectedStock.stockCode}
               isAsking={isAsking}
-              askResult={askResult}
-              onAskQuestion={askQuestion}
+              messages={currentMessages}
+              onAskQuestion={handleAskQuestion}
             />
           </>
         )}
