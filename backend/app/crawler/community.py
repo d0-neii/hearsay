@@ -263,7 +263,14 @@ def crawl_quick_all():
     print(f"초기 크롤링 완료 — 총 {total}개 저장")
 
     scored = score_all_posts()
-    print(f"감성 분석 완료 — {scored}개 채점\n")
+    print(f"감성 분석 완료 — {scored}개 채점")
+
+    from app.embedder import embed_unprocessed_posts
+    embed_unprocessed_posts()
+
+    from app.rag.bm25_index import rebuild_index
+    rebuild_index()
+    print()
 
 
 def crawl_all():
