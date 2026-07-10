@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { PostItem } from '../types'
 import { classifySentiment, SENTIMENT_LABEL_KO } from '../utils/sentiment'
 import { formatTimeAgo } from '../utils/time'
@@ -20,6 +21,43 @@ const SentimentBadge = ({ sentimentScore }: { sentimentScore: number | null }) =
   )
 }
 
+const PostCard = ({ post }: { post: PostItem }) => {
+  const [expanded, setExpanded] = useState(false)
+  const hasContent = !!post.content
+
+  return (
+    <div
+      className={`px-4 py-3 border-b border-border-light transition-colors duration-[120ms] ${hasContent ? 'cursor-pointer hover:bg-surface-hover' : ''}`}
+      onClick={() => hasContent && setExpanded((prev) => !prev)}
+    >
+      <div className="flex items-center justify-between mb-1.5">
+        <SentimentBadge sentimentScore={post.sentimentScore} />
+        <span className="text-[11px] text-muted">{formatTimeAgo(post.postedAt)}</span>
+      </div>
+
+      <p className={`text-xs text-primary leading-[1.5] ${expanded ? '' : 'line-clamp-2'}`}>
+        {post.title}
+      </p>
+
+      {expanded && post.content && (
+        <p className="mt-2 text-[11px] text-secondary leading-[1.6] line-clamp-6 whitespace-pre-line">
+          {post.content}
+        </p>
+      )}
+
+      <div className="flex items-center gap-2.5 mt-1.5">
+        <span className="text-[10px] text-muted">조회 {post.viewCount.toLocaleString()}</span>
+        {post.likeCount > 0 && (
+          <span className="text-[10px] text-muted">👍 {post.likeCount}</span>
+        )}
+        {hasContent && (
+          <span className="text-[10px] text-muted ml-auto">{expanded ? '접기 ↑' : '본문 보기 ↓'}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export const PostFeed = ({ postFeed }: Props) => {
   return (
     <aside className="bg-surface border-l border-border flex flex-col overflow-hidden">
@@ -29,13 +67,7 @@ export const PostFeed = ({ postFeed }: Props) => {
       </div>
       <div className="flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent]">
         {postFeed.map((post) => (
-          <div key={post.id} className="px-4 py-3 border-b border-border-light transition-colors duration-[120ms] hover:bg-surface-hover">
-            <div className="flex items-center justify-between mb-1.5">
-              <SentimentBadge sentimentScore={post.sentimentScore} />
-              <span className="text-[11px] text-muted">{formatTimeAgo(post.postedAt)}</span>
-            </div>
-            <p className="text-xs text-primary leading-[1.5] line-clamp-2">{post.title}</p>
-          </div>
+          <PostCard key={post.id} post={post} />
         ))}
       </div>
     </aside>

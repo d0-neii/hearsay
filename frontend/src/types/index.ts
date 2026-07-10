@@ -38,6 +38,7 @@ export const postItemSchema = z
   .object({
     id: z.number(),
     title: z.string(),
+    content: z.string().nullable().optional(),
     author: z.string(),
     views: z.number(),
     likes: z.number(),
@@ -47,6 +48,7 @@ export const postItemSchema = z
   .transform((raw) => ({
     id: raw.id,
     title: raw.title,
+    content: raw.content ?? null,
     author: raw.author,
     viewCount: raw.views,
     likeCount: raw.likes,

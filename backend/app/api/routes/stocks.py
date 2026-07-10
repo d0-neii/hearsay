@@ -146,7 +146,7 @@ def get_posts(stock_code: str, limit: int = 20):
     db = SessionLocal()
     try:
         result = db.execute(text("""
-            SELECT id, title, author, views, likes, sentiment_score, posted_at
+            SELECT id, title, content, author, views, likes, sentiment_score, posted_at
             FROM posts
             WHERE stock_code = :code
             ORDER BY posted_at DESC
@@ -157,6 +157,7 @@ def get_posts(stock_code: str, limit: int = 20):
             {
                 "id": row.id,
                 "title": row.title,
+                "content": row.content,
                 "author": row.author,
                 "views": row.views,
                 "likes": row.likes,
