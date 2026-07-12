@@ -185,7 +185,7 @@ def get_timeseries(stock_code: str):
                      ELSE AVG(sentiment_score)
                 END as avg_score
             FROM posts
-            WHERE stock_code = :code AND posted_at IS NOT NULL
+            WHERE stock_code = :code AND posted_at IS NOT NULL AND DATE(posted_at) >= CURRENT_DATE - INTERVAL '1 day'
             GROUP BY hour
             ORDER BY hour
         """), {"code": stock_code})
