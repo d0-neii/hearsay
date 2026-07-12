@@ -53,7 +53,7 @@ def score_all_posts(batch_size: int = 32) -> int:
     db = SessionLocal()
     try:
         rows = db.execute(text(
-            "SELECT id, title FROM posts WHERE sentiment_score IS NULL"
+            "SELECT id, title, content FROM posts WHERE sentiment_score IS NULL"
         )).fetchall()
 
         if not rows:
@@ -65,7 +65,11 @@ def score_all_posts(batch_size: int = 32) -> int:
         # 배치 단위 추론 (메모리 안전)
         for i in range(0, len(rows), batch_size):
             batch = rows[i : i + batch_size]
-            texts = [row.title or "" for row in batch]
+            # 제목 + 본문 합산 (본문 없으면 제목만). 512토큰 내에서 truncation됨.
+            texts = [
+                f"{row.title or ''} {row.content or ''}".strip() or " "
+                for row in batch
+            ]
 
             batch_results = pipe(texts, batch_size=batch_size)
 
