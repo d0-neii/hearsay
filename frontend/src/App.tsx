@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { StockSidebar } from './components/StockSidebar'
+import { StockOverview } from './components/StockOverview'
 import { SentimentChart } from './components/SentimentChart'
 import { StatCards } from './components/StatCard'
 import { PostFeed } from './components/PostFeed'
@@ -40,11 +41,6 @@ export default function App() {
     setMessages([])
   }, [selectedStock?.stockCode, resetAsk])
 
-  // 실제 KRX 매수/매도 비율 우선 사용, 없으면 커뮤니티 감성 비율로 fallback
-  const buyRatio = tradingData?.buyRatio
-    ?? (selectedStock ? Math.round(selectedStock.todayPositiveRatio ?? selectedStock.positiveRatio) : 50)
-  const sellRatio = 100 - buyRatio
-
   return (
     <div className="grid grid-cols-[220px_1fr_300px] h-screen overflow-hidden">
       <StockSidebar
@@ -64,40 +60,7 @@ export default function App() {
 
         {selectedStock && (
           <>
-            <div className="flex justify-between items-start">
-              <h2 className="text-[22px] font-bold text-primary tracking-[-0.5px] flex items-baseline gap-2">
-                {selectedStock.stockName}
-                <span className="text-[13px] font-normal text-muted font-mono">{selectedStock.stockCode}</span>
-              </h2>
-              <span className="text-xs text-muted pt-1.5">{selectedStock.totalPostCount}개 게시글</span>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-center gap-2 text-sm font-semibold">
-                <span className="text-positive">{buyRatio}% 매수</span>
-                <span className="text-border-strong">|</span>
-                <span className="text-negative">매도 {sellRatio}%</span>
-                {tradingData?.buyRatio == null && (
-                  <span className="text-[10px] font-normal text-muted">(커뮤니티 추정)</span>
-                )}
-              </div>
-              <div className="flex h-2 rounded-full border border-border overflow-hidden">
-                {/* 매수: 오른쪽 정렬 (중심 방향) */}
-                <div className="flex-1 overflow-hidden flex justify-end">
-                  <div
-                    className="h-full bg-positive-bar transition-[width] duration-[400ms] ease-in-out"
-                    style={{ width: `${Math.min(buyRatio * 2, 100)}%` }}
-                  />
-                </div>
-                {/* 매도: 왼쪽 정렬 (중심 방향) */}
-                <div className="flex-1 overflow-hidden flex justify-start">
-                  <div
-                    className="h-full bg-negative-bar transition-[width] duration-[400ms] ease-in-out"
-                    style={{ width: `${Math.min(sellRatio * 2, 100)}%` }}
-                  />
-                </div>
-              </div>
-            </div>
+            <StockOverview stock={selectedStock} tradingData={tradingData} />
 
             <DailySummary data={dailySummary} isLoading={isDailySummaryLoading} />
 
