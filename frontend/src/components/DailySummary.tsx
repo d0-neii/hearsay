@@ -1,5 +1,6 @@
 import type { DailySummary as DailySummaryData } from '../types'
 import { formatTimeAgo } from '../utils/time'
+import { Card } from './Card'
 
 type Props = {
   data: DailySummaryData | undefined
@@ -21,7 +22,7 @@ const Badge = ({ type }: { type: TagType }) => (
 )
 
 const Skeleton = () => (
-  <div className="bg-surface border border-border rounded-xl px-5 py-4 flex flex-col gap-3 animate-pulse">
+  <Card className="flex flex-col gap-3 animate-pulse">
     <div className="flex items-center justify-between">
       <div className="h-3.5 w-24 bg-positive-bg rounded" />
       <div className="h-3 w-16 bg-positive-bg rounded" />
@@ -34,7 +35,7 @@ const Skeleton = () => (
         </div>
       ))}
     </div>
-  </div>
+  </Card>
 )
 
 export const DailySummary = ({ data, isLoading }: Props) => {
@@ -42,7 +43,7 @@ export const DailySummary = ({ data, isLoading }: Props) => {
   if (!data || !data.items.length) return null
 
   return (
-    <div className="bg-surface border border-border rounded-xl px-5 py-4 flex flex-col gap-3">
+    <Card className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <span className="text-[13px] font-semibold text-positive flex items-center gap-1.5">
           ✦ 오늘의 요약
@@ -58,6 +59,6 @@ export const DailySummary = ({ data, isLoading }: Props) => {
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   )
 }

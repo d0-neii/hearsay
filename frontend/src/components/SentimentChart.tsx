@@ -8,6 +8,7 @@ import {
   ReferenceLine,
 } from 'recharts'
 import type { SentimentPoint } from '../types'
+import { Card } from './Card'
 
 type Props = {
   data: SentimentPoint[]
@@ -24,7 +25,7 @@ export const SentimentChart = ({ data }: Props) => {
   }))
 
   return (
-    <div className="bg-surface border border-border rounded-lg px-5 py-4">
+    <Card>
       <p className="text-[11px] font-semibold text-muted mb-3 uppercase tracking-[0.5px]">시간대별 여론 추이</p>
       <ResponsiveContainer width="100%" height={160}>
         <AreaChart data={chartData} margin={{ top: 4, right: 8, left: -10, bottom: 8 }}>
@@ -68,6 +69,6 @@ export const SentimentChart = ({ data }: Props) => {
           />
         </AreaChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   )
 }

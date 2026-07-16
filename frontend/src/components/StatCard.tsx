@@ -1,4 +1,5 @@
 import type { StockSummary, TradingData } from '../types'
+import { Card } from './Card'
 
 type Props = {
   label: string
@@ -15,7 +16,7 @@ export const StatCard = ({
   sub,
   subClassName = 'text-muted',
 }: Props) => (
-  <div className="bg-surface border border-border rounded-lg px-4 py-3.5 flex flex-col gap-2 min-w-0">
+  <Card pad="sm" className="flex flex-col gap-2 min-w-0">
     <span className="text-[10px] font-semibold text-muted tracking-[0.6px]">
       {label}
     </span>
@@ -27,7 +28,7 @@ export const StatCard = ({
         {sub}
       </span>
     )}
-  </div>
+  </Card>
 )
 
 type CardValue = Omit<Props, 'label'>

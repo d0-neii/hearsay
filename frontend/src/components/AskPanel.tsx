@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Card } from './Card'
 
 type ChatMessage = { question: string; answer: string }
 
@@ -26,7 +27,7 @@ export const AskPanel = ({ isAsking, messages, onAskQuestion }: Props) => {
   }
 
   return (
-    <div className="bg-surface border border-border rounded-lg p-5">
+    <Card>
       <p className="text-[13px] font-semibold text-primary mb-3.5">✦ 커뮤니티에 물어보기</p>
 
       <div className="flex flex-wrap gap-1.5 mb-3">
@@ -84,6 +85,6 @@ export const AskPanel = ({ isAsking, messages, onAskQuestion }: Props) => {
           <p className="text-[13px] text-muted">분석 중...</p>
         </div>
       )}
-    </div>
+    </Card>
   )
 }
