@@ -7,14 +7,11 @@ export const stockSummarySchema = z
     stock_code: z.string(),
     stock_name: z.string(),
     total: z.number(),
-    positive: z.number(),
-    negative: z.number(),
     avg_score: z.number(),
     positive_ratio: z.number(),
     // 카드용 신규 필드 — optional: 백엔드 미배포 시에도 파싱 오류 없이 graceful degradation
     today_total: z.number().optional(),
     today_positive_ratio: z.number().nullable().optional(),
-    prev_positive_ratio: z.number().nullable().optional(),
     post_count_ratio: z.number().nullable().optional(),
     hot_keyword: z.string().nullable().optional(),
   })
@@ -22,14 +19,11 @@ export const stockSummarySchema = z
     stockCode: raw.stock_code,
     stockName: raw.stock_name,
     totalPostCount: raw.total,
-    positivePostCount: raw.positive,
-    negativePostCount: raw.negative,
     avgSentimentScore: raw.avg_score,
     positiveRatio: raw.positive_ratio,
     // 카드용 신규 필드
     todayTotalCount: raw.today_total ?? null,
     todayPositiveRatio: raw.today_positive_ratio ?? null,
-    prevPositiveRatio: raw.prev_positive_ratio ?? null,
     postCountRatio: raw.post_count_ratio ?? null,
     hotKeyword: raw.hot_keyword ?? null,
   }))
@@ -68,27 +62,8 @@ export const sentimentPointSchema = z
     avgSentimentScore: raw.avg_score,
   }))
 
-const askSourceSchema = z
-  .object({
-    id: z.number(),
-    stock_name: z.string(),
-    stock_code: z.string(),
-    title: z.string(),
-    posted_at: z.string(),
-    distance: z.number().nullable(),
-  })
-  .transform((raw) => ({
-    id: raw.id,
-    stockName: raw.stock_name,
-    stockCode: raw.stock_code,
-    title: raw.title,
-    postedAt: raw.posted_at,
-    distance: raw.distance,
-  }))
-
 export const askResultSchema = z.object({
   answer: z.string(),
-  sources: z.array(askSourceSchema),
 })
 
 export const dailySummarySchema = z.object({
@@ -105,7 +80,6 @@ export type StockSummary = z.infer<typeof stockSummarySchema>
 export type PostItem = z.infer<typeof postItemSchema>
 export type SentimentPoint = z.infer<typeof sentimentPointSchema>
 export type AskResult = z.infer<typeof askResultSchema>
-export type AskSource = z.infer<typeof askSourceSchema>
 export type DailySummary = z.infer<typeof dailySummarySchema>
 
 // ===== 실제 매수/매도 거래 비율 (KRX 투자자별 데이터) =====
@@ -115,13 +89,11 @@ export const tradingDataSchema = z
     buy_ratio: z.number().nullable(),
     sell_ratio: z.number().nullable(),
     detail: z.record(z.string(), z.number()).nullable().optional(),
-    date: z.string().nullable(),
   })
   .transform((raw) => ({
     buyRatio: raw.buy_ratio,
     sellRatio: raw.sell_ratio,
     detail: raw.detail ?? null,  // 예: { "개인": 1200000000, "기관합계": -800000000 }
-    date: raw.date,
   }))
 
 export type TradingData = z.infer<typeof tradingDataSchema>
