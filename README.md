@@ -1,6 +1,6 @@
 <div align="center">
 
-# Hearsay
+<img alt="logo" src="https://github.com/user-attachments/assets/6d745faa-dd14-47c2-a999-d8f129efeb42" style="width:360px; height:auto;"/>
 
 **주식 커뮤니티의 목소리를 감성으로 읽다**
 
