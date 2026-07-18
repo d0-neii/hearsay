@@ -13,15 +13,18 @@ const QUICK_QUERIES = ['오늘 왜 올랐어?', '실적 이후 반응은?', '지
 
 export const AskPanel = ({ isAsking, messages, onAskQuestion }: Props) => {
   const [inputQuery, setInputQuery] = useState('')
+  const [lastQuery, setLastQuery] = useState('')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!inputQuery.trim()) return
+    setLastQuery(inputQuery)
     onAskQuestion(inputQuery)
     setInputQuery('')
   }
 
   const handleQuickQuery = (query: string) => {
+    setLastQuery(query)
     onAskQuestion(query)
     setInputQuery('')
   }
@@ -71,7 +74,7 @@ export const AskPanel = ({ isAsking, messages, onAskQuestion }: Props) => {
           ))}
           {isAsking && (
             <div className="flex flex-col gap-1.5">
-              <p className="text-[12px] text-muted font-medium">Q. {inputQuery || '...'}</p>
+              <p className="text-[12px] text-muted font-medium">Q. {lastQuery}</p>
               <div className="bg-base rounded-md px-4 py-3.5 border-l-[3px] border-l-primary opacity-50">
                 <p className="text-[13px] text-muted">분석 중...</p>
               </div>
@@ -81,8 +84,11 @@ export const AskPanel = ({ isAsking, messages, onAskQuestion }: Props) => {
       )}
 
       {messages.length === 0 && isAsking && (
-        <div className="bg-base rounded-md px-4 py-3.5 border-l-[3px] border-l-primary opacity-50">
-          <p className="text-[13px] text-muted">분석 중...</p>
+        <div className="flex flex-col gap-1.5">
+          <p className="text-[12px] text-muted font-medium">Q. {lastQuery}</p>
+          <div className="bg-base rounded-md px-4 py-3.5 border-l-[3px] border-l-primary opacity-50">
+            <p className="text-[13px] text-muted">분석 중...</p>
+          </div>
         </div>
       )}
     </Card>
