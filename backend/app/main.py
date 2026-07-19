@@ -22,10 +22,11 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        for code, name in STOCK_LIST.items():
-            if not db.query(Stock).filter(Stock.stock_code == code).first():
+        # 테이블이 완전히 비어있을 때(최초 실행)만 기본 종목 시드
+        if db.query(Stock).count() == 0:
+            for code, name in STOCK_LIST.items():
                 db.add(Stock(stock_code=code, stock_name=name))
-        db.commit()
+            db.commit()
     finally:
         db.close()
 
