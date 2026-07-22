@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useAddStock, useDeleteStock } from '../hooks/useAskQuestion'
+import { useAddStock, useDeleteStock } from '../hooks/useStockMutations'
 import { useStockSearch } from '../hooks/useStockQueries'
 import type { StockSummary } from '../types'
 import type { StockSearchResult } from '../api'

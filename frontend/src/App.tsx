@@ -7,7 +7,7 @@ import { PostFeed } from './components/PostFeed'
 import { AskPanel } from './components/AskPanel'
 import { DailySummary } from './components/DailySummary'
 import { useStockList, usePostFeed, useSentimentChart, useDailySummary, useTradingData } from './hooks/useStockQueries'
-import { useAskQuestion } from './hooks/useAskQuestion'
+import { useAskQuestion } from './hooks/useStockMutations'
 import type { StockSummary } from './types'
 
 type ChatMessage = { question: string; answer: string }
