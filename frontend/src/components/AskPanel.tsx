@@ -62,7 +62,7 @@ export const AskPanel = ({ isAsking, messages, onAskQuestion }: Props) => {
         </button>
       </form>
 
-      {messages.length > 0 && (
+      {(messages.length > 0 || isAsking) && (
         <div className="flex flex-col gap-3">
           {messages.map((msg, i) => (
             <div key={i} className="flex flex-col gap-1.5">
@@ -80,15 +80,6 @@ export const AskPanel = ({ isAsking, messages, onAskQuestion }: Props) => {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {messages.length === 0 && isAsking && (
-        <div className="flex flex-col gap-1.5">
-          <p className="text-[12px] text-muted font-medium">Q. {lastQuery}</p>
-          <div className="bg-base rounded-md px-4 py-3.5 border-l-[3px] border-l-primary opacity-50">
-            <p className="text-[13px] text-muted">분석 중...</p>
-          </div>
         </div>
       )}
     </Card>
