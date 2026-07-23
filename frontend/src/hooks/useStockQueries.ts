@@ -2,12 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchStockList, fetchPostFeed, fetchSentimentChart, fetchDailySummary, searchStocks, fetchTradingData } from '../api/index'
 
 const STALE_TIME = 1000 * 60 * 5 // 5분
+const TRADING_STALE_TIME = 1000 * 60 * 30 // 30분 (장중 변동 반영 주기)
 
 export const useStockList = () => {
   return useQuery({
     queryKey: ['stockList'],
     queryFn: fetchStockList,
     staleTime: STALE_TIME,
+    refetchInterval: STALE_TIME,
   })
 }
 
@@ -17,6 +19,7 @@ export const usePostFeed = (stockCode: string | undefined) => {
     queryFn: () => fetchPostFeed(stockCode!),
     enabled: !!stockCode,
     staleTime: STALE_TIME,
+    refetchInterval: STALE_TIME,
   })
 }
 
@@ -26,6 +29,7 @@ export const useSentimentChart = (stockCode: string | undefined) => {
     queryFn: () => fetchSentimentChart(stockCode!),
     enabled: !!stockCode,
     staleTime: STALE_TIME,
+    refetchInterval: STALE_TIME,
   })
 }
 
@@ -35,6 +39,7 @@ export const useDailySummary = (stockCode: string | undefined) => {
     queryFn: () => fetchDailySummary(stockCode!),
     enabled: !!stockCode,
     staleTime: STALE_TIME,
+    refetchInterval: STALE_TIME,
   })
 }
 
@@ -43,7 +48,8 @@ export const useTradingData = (stockCode: string | undefined) => {
     queryKey: ['tradingData', stockCode],
     queryFn: () => fetchTradingData(stockCode!),
     enabled: !!stockCode,
-    staleTime: 1000 * 60 * 30, // 30분 (장중 변동 반영 주기)
+    staleTime: TRADING_STALE_TIME,
+    refetchInterval: TRADING_STALE_TIME,
   })
 }
 
