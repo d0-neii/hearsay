@@ -1,9 +1,10 @@
 import threading
 import requests
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from app.core.database import SessionLocal
+from app.core.database import get_db
 from app.models.stock import Stock
 
 router = APIRouter()
@@ -49,14 +50,10 @@ def search_stocks(q: str):
 
 
 @router.get("/stocks/manage")
-def list_managed_stocks():
+def list_managed_stocks(db: Session = Depends(get_db)):
     """현재 관리 중인 종목 목록"""
-    db = SessionLocal()
-    try:
-        stocks = db.query(Stock).order_by(Stock.created_at).all()
-        return [{"stock_code": s.stock_code, "stock_name": s.stock_name} for s in stocks]
-    finally:
-        db.close()
+    stocks = db.query(Stock).order_by(Stock.created_at).all()
+    return [{"stock_code": s.stock_code, "stock_name": s.stock_name} for s in stocks]
 
 
 def _crawl_single(stock_code: str, stock_name: str):
@@ -74,35 +71,27 @@ def _crawl_single(stock_code: str, stock_name: str):
 
 
 @router.post("/stocks/manage", status_code=201)
-def add_stock(body: StockIn):
+def add_stock(body: StockIn, db: Session = Depends(get_db)):
     """종목 추가 + 즉시 크롤링"""
-    db = SessionLocal()
-    try:
-        existing = db.query(Stock).filter(Stock.stock_code == body.stock_code).first()
-        if existing:
-            raise HTTPException(status_code=409, detail="이미 추가된 종목입니다.")
-        db.add(Stock(stock_code=body.stock_code, stock_name=body.stock_name))
-        db.commit()
-        # 응답은 바로 반환하고, 크롤링은 백그라운드에서
-        threading.Thread(
-            target=_crawl_single,
-            args=(body.stock_code, body.stock_name),
-            daemon=True,
-        ).start()
-        return {"stock_code": body.stock_code, "stock_name": body.stock_name}
-    finally:
-        db.close()
+    existing = db.query(Stock).filter(Stock.stock_code == body.stock_code).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="이미 추가된 종목입니다.")
+    db.add(Stock(stock_code=body.stock_code, stock_name=body.stock_name))
+    db.commit()
+    # 응답은 바로 반환하고, 크롤링은 백그라운드에서
+    threading.Thread(
+        target=_crawl_single,
+        args=(body.stock_code, body.stock_name),
+        daemon=True,
+    ).start()
+    return {"stock_code": body.stock_code, "stock_name": body.stock_name}
 
 
 @router.delete("/stocks/manage/{stock_code}", status_code=204)
-def delete_stock(stock_code: str):
+def delete_stock(stock_code: str, db: Session = Depends(get_db)):
     """종목 삭제"""
-    db = SessionLocal()
-    try:
-        stock = db.query(Stock).filter(Stock.stock_code == stock_code).first()
-        if not stock:
-            raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다.")
-        db.delete(stock)
-        db.commit()
-    finally:
-        db.close()
+    stock = db.query(Stock).filter(Stock.stock_code == stock_code).first()
+    if not stock:
+        raise HTTPException(status_code=404, detail="종목을 찾을 수 없습니다.")
+    db.delete(stock)
+    db.commit()

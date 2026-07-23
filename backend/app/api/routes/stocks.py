@@ -1,13 +1,14 @@
 import json
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from openai import OpenAI
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 import os
 
-from app.core.database import SessionLocal
+from app.core.database import get_db
 from app.api.keywords import extract_hot_keyword
 from app.crawler.trading import get_buy_sell_ratio
 
@@ -18,11 +19,10 @@ router = APIRouter()
 
 
 @router.get("/stocks")
-def get_stocks():
+def get_stocks(db: Session = Depends(get_db)):
     """종목별 통계 (게시글 수, 감성 비율, 어제 대비, 언급량 비교, 핫키워드)"""
-    db = SessionLocal()
+    # 1. 종목별 통계 집계 — stocks LEFT JOIN posts (게시글 없는 종목도 포함)
     try:
-        # 1. 종목별 통계 집계 — stocks LEFT JOIN posts (게시글 없는 종목도 포함)
         result = db.execute(text("""
             SELECT
                 s.stock_code,
@@ -87,14 +87,13 @@ def get_stocks():
             }
             for row in rows
         ]
-    finally:
-        db.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/stocks/{stock_code}/daily-summary")
-def get_daily_summary(stock_code: str):
+def get_daily_summary(stock_code: str, db: Session = Depends(get_db)):
     """오늘 게시글 기반 자동 요약 (이슈/호재/악재)"""
-    db = SessionLocal()
     try:
         rows = db.execute(text("""
             SELECT title
@@ -136,14 +135,11 @@ def get_daily_summary(stock_code: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
 
 
 @router.get("/stocks/{stock_code}/posts")
-def get_posts(stock_code: str, limit: int = 20):
+def get_posts(stock_code: str, limit: int = 20, db: Session = Depends(get_db)):
     """종목별 최근 게시글"""
-    db = SessionLocal()
     try:
         result = db.execute(text("""
             SELECT id, title, content, author, views, likes, sentiment_score, posted_at
@@ -166,14 +162,13 @@ def get_posts(stock_code: str, limit: int = 20):
             }
             for row in rows
         ]
-    finally:
-        db.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/stocks/{stock_code}/timeseries")
-def get_timeseries(stock_code: str):
+def get_timeseries(stock_code: str, db: Session = Depends(get_db)):
     """시간대별 게시글 수 + 평균 감성 점수"""
-    db = SessionLocal()
     try:
         result = db.execute(text("""
             SELECT
@@ -198,8 +193,8 @@ def get_timeseries(stock_code: str):
             }
             for row in rows
         ]
-    finally:
-        db.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/stocks/{stock_code}/trading")
