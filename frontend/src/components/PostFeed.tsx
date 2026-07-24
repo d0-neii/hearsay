@@ -5,6 +5,7 @@ import { formatTimeAgo } from '../utils/time'
 
 type Props = {
   postFeed: PostItem[]
+  isLoading?: boolean
 }
 
 const SentimentBadge = ({ sentimentScore }: { sentimentScore: number | null }) => {
@@ -58,7 +59,16 @@ const PostCard = ({ post }: { post: PostItem }) => {
   )
 }
 
-export const PostFeed = ({ postFeed }: Props) => {
+const EmptyState = () => (
+  <div className="flex flex-col items-center justify-center h-full gap-2 pb-8">
+    <span className="text-2xl">🔍</span>
+    <p className="text-[12px] text-muted text-center leading-relaxed">
+      아직 수집된 게시글이 없어요
+    </p>
+  </div>
+)
+
+export const PostFeed = ({ postFeed, isLoading = false }: Props) => {
   return (
     <aside className="bg-surface border-l border-border flex flex-col overflow-hidden">
       <div className="flex items-center gap-2 p-4 border-b border-border-light">
@@ -66,9 +76,15 @@ export const PostFeed = ({ postFeed }: Props) => {
         <span className="text-xs font-semibold text-secondary tracking-[0.5px]">실시간 게시글</span>
       </div>
       <div className="flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent]">
-        {postFeed.map((post) => (
-          <PostCard key={post.id} post={post} />
-        ))}
+        {isLoading ? (
+          <p className="py-10 text-center text-[12px] text-muted">불러오는 중...</p>
+        ) : postFeed.length === 0 ? (
+          <EmptyState />
+        ) : (
+          postFeed.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))
+        )}
       </div>
     </aside>
   )

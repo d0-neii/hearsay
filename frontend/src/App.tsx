@@ -21,7 +21,7 @@ export default function App() {
   // 사용자가 직접 고른 종목이 있으면 그것을, 아니면 목록의 첫 번째 종목을 기본값으로 사용
   const selectedStock = manuallySelectedStock ?? stockList[0] ?? null
 
-  const { data: postFeed = [] } = usePostFeed(selectedStock?.stockCode)
+  const { data: postFeed = [], isLoading: isPostFeedLoading } = usePostFeed(selectedStock?.stockCode)
   const { data: sentimentChartData = [] } = useSentimentChart(selectedStock?.stockCode)
   const { data: dailySummary, isLoading: isDailySummaryLoading } = useDailySummary(selectedStock?.stockCode)
   const { data: tradingData } = useTradingData(selectedStock?.stockCode)
@@ -79,7 +79,7 @@ export default function App() {
         )}
       </main>
 
-      <PostFeed postFeed={postFeed} />
+      <PostFeed postFeed={postFeed} isLoading={isPostFeedLoading} />
     </div>
   )
 }
