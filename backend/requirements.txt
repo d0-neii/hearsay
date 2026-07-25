@@ -1,0 +1,40 @@
+# Hearsay backend dependencies
+# 설치: pip install -r requirements.txt
+#
+# 직접 사용하는 패키지만 명시합니다 (전이 의존성은 pip이 해결)
+# 버전은 현재 venv 기준으로 고정
+
+# --- Web / API ---
+fastapi==0.139.0
+uvicorn[standard]==0.49.0
+pydantic==2.13.4
+pydantic-settings==2.7.0
+python-dotenv==1.2.2
+
+# --- Database ---
+SQLAlchemy==2.0.51
+psycopg2-binary==2.9.12
+pgvector==0.4.2
+
+# --- Crawling ---
+requests==2.34.2
+beautifulsoup4==4.15.0
+APScheduler==3.11.3
+
+# --- LLM / Embedding ---
+openai==2.44.0
+
+# --- Sentiment (KR-FinBert) ---
+transformers==5.13.0
+torch==2.12.1
+accelerate==1.14.0
+
+# --- Search ---
+rank-bm25==0.2.2
+
+# --- Market data ---
+pykrx==1.2.8
+
+# --- Scripts (finetune / eval) ---
+scikit-learn==1.9.0
+numpy==2.5.0
