@@ -1,18 +1,13 @@
 import re
 from datetime import datetime, timedelta
+
 from sqlalchemy import text
-from openai import OpenAI
-from dotenv import load_dotenv
-import os
+
+from app.core.config import settings
 from app.core.database import SessionLocal
+from app.core.llm import openai_client
 from app.embedder import get_embedding
 from .bm25_index import search as bm25_search
-
-load_dotenv()
-_openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# RRF 상수: 순위 충격 완화용
-_RRF_K = 60
 
 
 def _generate_hypothetical_document(query: str) -> str:
@@ -27,8 +22,8 @@ def _generate_hypothetical_document(query: str) -> str:
         "삼성전자, 반도체 수요 회복 기대감에 커뮤니티 긍정 여론 증가"
     """
     try:
-        response = _openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+        response = openai_client.chat.completions.create(
+            model=settings.llm_model,
             max_tokens=80,
             temperature=0,
             messages=[
@@ -173,17 +168,18 @@ def _reciprocal_rank_fusion(
     """
     rrf_scores: dict[int, float] = {}
     meta_map: dict[int, dict] = {}
+    k = settings.rrf_k
 
     # 벡터 검색 결과 반영
     for rank, post in enumerate(vector_results, start=1):
         pid = post["id"]
-        rrf_scores[pid] = rrf_scores.get(pid, 0.0) + 1.0 / (_RRF_K + rank)
+        rrf_scores[pid] = rrf_scores.get(pid, 0.0) + 1.0 / (k + rank)
         meta_map[pid] = post
 
     # BM25 검색 결과 반영 (post_id 키가 "post_id"임에 주의)
     for rank, post in enumerate(bm25_results, start=1):
         pid = post["post_id"]
-        rrf_scores[pid] = rrf_scores.get(pid, 0.0) + 1.0 / (_RRF_K + rank)
+        rrf_scores[pid] = rrf_scores.get(pid, 0.0) + 1.0 / (k + rank)
         if pid not in meta_map:
             meta_map[pid] = {
                 "id": pid,
@@ -202,7 +198,11 @@ def _reciprocal_rank_fusion(
     return [meta_map[pid] for pid in sorted_ids[:top_k]]
 
 
-def search_similar_posts(query: str, stock_code: str = None, top_k: int = 5) -> list[dict]:
+def search_similar_posts(
+    query: str,
+    stock_code: str | None = None,
+    top_k: int | None = None,
+) -> list[dict]:
     """
     Hybrid Search (BM25 + Vector) + RRF 기반 유사 게시글 검색.
 
@@ -211,16 +211,17 @@ def search_similar_posts(query: str, stock_code: str = None, top_k: int = 5) -> 
     3. BM25 검색으로 후보 top-20 추출
     4. RRF로 두 결과 합산 → 최종 top_k 반환
     """
-    CANDIDATE_K = 20
+    candidate_k = settings.search_candidate_k
+    top_k = top_k if top_k is not None else settings.search_top_k
 
     date_from, date_to = _parse_date_range(query)
 
     vector_results = _vector_search(
-        query, stock_code=stock_code, top_k=CANDIDATE_K,
+        query, stock_code=stock_code, top_k=candidate_k,
         date_from=date_from, date_to=date_to,
     )
     bm25_results = bm25_search(
-        query, top_k=CANDIDATE_K, stock_code=stock_code,
+        query, top_k=candidate_k, stock_code=stock_code,
         date_from=date_from, date_to=date_to,
     )
 

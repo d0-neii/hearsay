@@ -2,13 +2,9 @@ from __future__ import annotations
 
 from transformers import pipeline
 from sqlalchemy import text
+
+from app.core.config import settings
 from app.core.database import SessionLocal
-
-import os
-from pathlib import Path
-
-_FINETUNED = Path(__file__).parent.parent / "finetuned_model"
-MODEL_NAME = str(_FINETUNED) if _FINETUNED.exists() else "snunlp/KR-FinBert-SC"
 
 # 앱 수명 동안 1회만 로드 (get_pipeline() 첫 호출 시)
 _pipeline = None
@@ -17,10 +13,10 @@ _pipeline = None
 def get_pipeline():
     global _pipeline
     if _pipeline is None:
-        print(f"[sentiment] 모델 로드 중: {MODEL_NAME}")
+        print(f"[sentiment] 모델 로드 중: {settings.sentiment_model_path}")
         _pipeline = pipeline(
             "text-classification",
-            model=MODEL_NAME,
+            model=settings.sentiment_model_path,
             top_k=None,       # 전체 라벨 확률 반환
             truncation=True,
             max_length=512,
@@ -29,18 +25,14 @@ def get_pipeline():
     return _pipeline
 
 
-# neutral 확률이 이 값 이상이면 점수를 0.0으로 확정
-_NEUTRAL_DOMINANCE = 0.5
-
-
 def _score_from_probs(probs: dict[str, float]) -> float:
     """
     라벨별 확률 딕셔너리 → 감성 점수 변환.
 
-    - P(neutral) >= 0.5: 모델이 중립으로 확신 → 0.0 반환
+    - P(neutral) >= settings.sentiment_neutral_dominance: 중립 확신 → 0.0 반환
     - 그 외: P(positive) - P(negative)  →  -1.0 ~ 1.0
     """
-    if probs.get("neutral", 0.0) >= _NEUTRAL_DOMINANCE:
+    if probs.get("neutral", 0.0) >= settings.sentiment_neutral_dominance:
         return 0.0
     return round(probs.get("positive", 0.0) - probs.get("negative", 0.0), 3)
 
@@ -60,11 +52,12 @@ def compute_sentiment(text: str) -> float:
     return _score_from_probs(probs)
 
 
-def score_all_posts(batch_size: int = 32) -> int:
+def score_all_posts(batch_size: int | None = None) -> int:
     """
     sentiment_score가 NULL인 게시글을 배치로 분석해서 업데이트.
     반환값: 채점된 게시글 수
     """
+    batch_size = batch_size if batch_size is not None else settings.sentiment_batch_size
     db = SessionLocal()
     try:
         rows = db.execute(text(

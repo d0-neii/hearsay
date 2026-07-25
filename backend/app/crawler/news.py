@@ -4,9 +4,10 @@ import re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models import Post
-from app.crawler.community import STOCK_LIST, HEADERS, get_stock_list
+from app.crawler.community import HEADERS, get_stock_list
 
 
 def _parse_date(date_str: str) -> datetime | None:
@@ -26,10 +27,16 @@ def _parse_date(date_str: str) -> datetime | None:
         return None
 
 
-def fetch_news(stock_code: str, stock_name: str, pages: int = 2) -> list[dict]:
+def fetch_news(
+    stock_code: str,
+    stock_name: str,
+    pages: int | None = None,
+) -> list[dict]:
     """
     네이버 금융 뉴스 탭에서 기사 목록 수집.
     """
+    pages = pages if pages is not None else settings.crawl_news_pages
+
     news_list = []
 
     for page in range(1, pages + 1):
@@ -86,7 +93,7 @@ def fetch_news(stock_code: str, stock_name: str, pages: int = 2) -> list[dict]:
                 "source_type": "news",
             })
 
-        time.sleep(0.3)
+        time.sleep(settings.crawl_detail_delay)
 
     return news_list
 
@@ -115,7 +122,7 @@ def crawl_news_all():
     total = 0
 
     for code, name in get_stock_list().items():
-        news = fetch_news(code, name, pages=2)
+        news = fetch_news(code, name)
         saved = save_news(news)
         print(f"  {name}({code}): {len(news)}개 수집, {saved}개 저장")
         total += saved

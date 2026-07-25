@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Float, Enum
-import enum
+from sqlalchemy import Column, Integer, String, Text, DateTime, Float
 from sqlalchemy.sql import func
 from pgvector.sqlalchemy import Vector
+
+from app.core.config import settings
 from app.core.database import Base
 
 
@@ -28,5 +29,5 @@ class PostEmbedding(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     post_id = Column(Integer, index=True)          # posts.id 참조
-    embedding = Column(Vector(1536))               # 임베딩 벡터 (OpenAI 기준 1536차원)
+    embedding = Column(Vector(settings.embedding_dim))  # 임베딩 벡터 (기본 1536차원)
     created_at = Column(DateTime, server_default=func.now())

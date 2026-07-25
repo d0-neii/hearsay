@@ -1,15 +1,15 @@
 from contextlib import asynccontextmanager
-from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from app.api.routes import api_router
+from app.core.config import settings
 from app.crawler import crawl_all
 from app.crawler.community import crawl_quick_all
-from app.api.routes import api_router
 
-_scheduler = BackgroundScheduler(timezone="Asia/Seoul")
+_scheduler = BackgroundScheduler(timezone=settings.scheduler_timezone)
 
 
 @asynccontextmanager
@@ -43,9 +43,9 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=crawl_quick_all, daemon=True).start()
     print("초기 빠른 크롤링 시작 (백그라운드)...")
 
-    _scheduler.add_job(crawl_all, "interval", minutes=10)
+    _scheduler.add_job(crawl_all, "interval", minutes=settings.crawl_interval_minutes)
     _scheduler.start()
-    print("스케줄러 시작 — 10분마다 전체 크롤링 반복합니다.")
+    print(f"스케줄러 시작 — {settings.crawl_interval_minutes}분마다 전체 크롤링 반복합니다.")
     yield
     _scheduler.shutdown()
     print("스케줄러 종료.")
@@ -55,7 +55,7 @@ app = FastAPI(title="Hearsay API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=settings.cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

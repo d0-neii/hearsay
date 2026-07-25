@@ -3,6 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models import Post
 
@@ -115,11 +116,18 @@ def fetch_posts_quick(stock_code: str, stock_name: str) -> list[dict]:
     return posts
 
 
-def fetch_posts(stock_code: str, stock_name: str, pages: int = 3, sleep: bool = True) -> list[dict]:
+def fetch_posts(
+    stock_code: str,
+    stock_name: str,
+    pages: int | None = None,
+    sleep: bool = True,
+) -> list[dict]:
     """
     종토방 게시글 목록 수집 → 상세 페이지 병렬 요청으로 전체 제목 + 본문 저장.
     sleep=True 이면 순차 요청 (정기 크롤링용), False 이면 병렬 요청 (초기 크롤링용).
     """
+    pages = pages if pages is not None else settings.crawl_pages
+
     # 1단계: 목록 페이지에서 기본 정보 수집
     raw_posts = []
 
@@ -183,12 +191,12 @@ def fetch_posts(stock_code: str, stock_name: str, pages: int = 3, sleep: bool = 
         details = []
         for p in raw_posts:
             details.append(fetch_post_detail(p["source_url"]))
-            time.sleep(0.3)
+            time.sleep(settings.crawl_detail_delay)
     else:
         # 초기 크롤링 — ThreadPoolExecutor로 병렬 요청
         from concurrent.futures import ThreadPoolExecutor
         urls = [p["source_url"] for p in raw_posts]
-        with ThreadPoolExecutor(max_workers=10) as ex:
+        with ThreadPoolExecutor(max_workers=settings.crawl_max_workers) as ex:
             details = list(ex.map(fetch_post_detail, urls))
 
     # 3단계: 목록 정보 + 상세 정보 합치기
@@ -255,7 +263,7 @@ def crawl_quick_all():
     stock_list = get_stock_list()
 
     for code, name in stock_list.items():
-        posts = fetch_posts(code, name, pages=2, sleep=False)
+        posts = fetch_posts(code, name, pages=settings.crawl_quick_pages, sleep=False)
         saved = save_posts(posts)
         print(f"  {name}({code}): {len(posts)}개 수집, {saved}개 저장")
         total += saved
@@ -285,7 +293,7 @@ def crawl_all():
 
     # 종토방 게시글
     for code, name in stock_list.items():
-        posts = fetch_posts(code, name, pages=3)
+        posts = fetch_posts(code, name)
         saved = save_posts(posts)
         print(f"  {name}({code}): {len(posts)}개 수집, {saved}개 저장")
         total += saved

@@ -16,15 +16,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from openai import OpenAI
 from sqlalchemy import text
+from app.core.config import settings
 from app.core.database import SessionLocal
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+from app.core.llm import openai_client as client
 
 OUTPUT_FILE = Path(__file__).parent.parent / "labeled_data.csv"
 BATCH_SIZE = 20   # GPT에 한 번에 넘길 게시글 수
@@ -95,7 +90,7 @@ def _gpt_label_batch(posts: list[dict]) -> dict[int, str]:
 {items}"""
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=settings.llm_model,
         max_tokens=500,
         response_format={"type": "json_object"},
         messages=[{"role": "user", "content": prompt}],

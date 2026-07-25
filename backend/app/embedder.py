@@ -1,22 +1,15 @@
-from openai import OpenAI
 from sqlalchemy import text
-from app.core.database import SessionLocal, engine
-from app.models import Post, PostEmbedding
-from dotenv import load_dotenv
-import os
 
-load_dotenv()
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# OpenAI Embeddings API 배치 최대 크기
-_EMBED_BATCH_SIZE = 100
+from app.core.config import settings
+from app.core.database import SessionLocal
+from app.core.llm import openai_client
+from app.models import PostEmbedding
 
 
 def get_embedding(text: str) -> list[float]:
     """텍스트를 임베딩 벡터로 변환 (단일 호출용 — HyDE 등에서 사용)"""
-    response = client.embeddings.create(
-        model="text-embedding-3-small",
+    response = openai_client.embeddings.create(
+        model=settings.embedding_model,
         input=text,
     )
     return response.data[0].embedding
@@ -26,13 +19,14 @@ def get_embeddings_batch(texts: list[str]) -> list[list[float]]:
     """
     여러 텍스트를 한 번의 API 호출로 임베딩.
     OpenAI는 input에 리스트를 받아 순서 보장된 벡터 배열을 반환.
-    _EMBED_BATCH_SIZE 단위로 나눠서 호출 (API 제한 대비).
+    settings.embedding_batch_size 단위로 나눠서 호출 (API 제한 대비).
     """
+    batch_size = settings.embedding_batch_size
     results: list[list[float]] = []
-    for i in range(0, len(texts), _EMBED_BATCH_SIZE):
-        chunk = texts[i : i + _EMBED_BATCH_SIZE]
-        response = client.embeddings.create(
-            model="text-embedding-3-small",
+    for i in range(0, len(texts), batch_size):
+        chunk = texts[i : i + batch_size]
+        response = openai_client.embeddings.create(
+            model=settings.embedding_model,
             input=chunk,
         )
         # response.data는 index 순서가 보장됨

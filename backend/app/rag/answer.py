@@ -1,19 +1,14 @@
-from openai import OpenAI
-from dotenv import load_dotenv
-import os
+from app.core.config import settings
+from app.core.llm import openai_client
 
 from .search import search_similar_posts
 
-load_dotenv()
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-
-def ask(query: str, stock_code: str = None) -> dict:
+def ask(query: str, stock_code: str | None = None) -> dict:
     """RAG 기반 질의응답"""
 
     # 1. 유사 게시글 검색
-    similar_posts = search_similar_posts(query, stock_code=stock_code, top_k=5)
+    similar_posts = search_similar_posts(query, stock_code=stock_code)
 
     if not similar_posts:
         return {
@@ -42,9 +37,10 @@ def ask(query: str, stock_code: str = None) -> dict:
     # 3. 감성 점수 분포 요약
     scores = [p["sentiment_score"] for p in similar_posts if p.get("sentiment_score") is not None]
     if scores:
+        threshold = settings.sentiment_positive_threshold
         avg_score = sum(scores) / len(scores)
-        pos_count = sum(1 for s in scores if s > 0.1)
-        neg_count = sum(1 for s in scores if s < -0.1)
+        pos_count = sum(1 for s in scores if s > threshold)
+        neg_count = sum(1 for s in scores if s < -threshold)
         neu_count = len(scores) - pos_count - neg_count
         sentiment_summary = (
             f"평균 감성 점수: {avg_score:+.2f} "
@@ -74,8 +70,8 @@ def ask(query: str, stock_code: str = None) -> dict:
 - 커뮤니티 반응/여론과 감성 점수를 근거로 여론 분위기를 설명하세요.
 - 2~3문장으로 간결하게 답해주세요."""
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
+    response = openai_client.chat.completions.create(
+        model=settings.llm_model,
         max_tokens=500,
         messages=[{"role": "user", "content": prompt}],
     )

@@ -2,18 +2,14 @@ import json
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from openai import OpenAI
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-from dotenv import load_dotenv
-import os
 
-from app.core.database import get_db
 from app.api.keywords import extract_hot_keyword
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.llm import openai_client
 from app.crawler.trading import get_buy_sell_ratio
-
-load_dotenv()
-_openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 router = APIRouter()
 
@@ -28,18 +24,18 @@ def get_stocks(db: Session = Depends(get_db)):
                 s.stock_code,
                 s.stock_name,
                 COUNT(p.id) as total,
-                SUM(CASE WHEN p.sentiment_score > 0.1 THEN 1 ELSE 0 END) as positive,
-                SUM(CASE WHEN p.sentiment_score < -0.1 THEN 1 ELSE 0 END) as negative,
+                SUM(CASE WHEN p.sentiment_score > :pos_th THEN 1 ELSE 0 END) as positive,
+                SUM(CASE WHEN p.sentiment_score < :neg_th THEN 1 ELSE 0 END) as negative,
                 AVG(p.sentiment_score) as avg_score,
                 -- 오늘
                 SUM(CASE WHEN DATE(p.posted_at) = CURRENT_DATE THEN 1 ELSE 0 END)
                     as today_total,
-                SUM(CASE WHEN DATE(p.posted_at) = CURRENT_DATE AND p.sentiment_score > 0.1 THEN 1 ELSE 0 END)
+                SUM(CASE WHEN DATE(p.posted_at) = CURRENT_DATE AND p.sentiment_score > :pos_th THEN 1 ELSE 0 END)
                     as today_positive,
                 -- 어제
                 SUM(CASE WHEN DATE(p.posted_at) = CURRENT_DATE - INTERVAL '1 day' THEN 1 ELSE 0 END)
                     as yesterday_total,
-                SUM(CASE WHEN DATE(p.posted_at) = CURRENT_DATE - INTERVAL '1 day' AND p.sentiment_score > 0.1 THEN 1 ELSE 0 END)
+                SUM(CASE WHEN DATE(p.posted_at) = CURRENT_DATE - INTERVAL '1 day' AND p.sentiment_score > :pos_th THEN 1 ELSE 0 END)
                     as yesterday_positive,
                 -- 최근 7일(오늘 제외) 합계 — 일평균 계산용
                 SUM(CASE WHEN DATE(p.posted_at) >= CURRENT_DATE - INTERVAL '7 days' AND DATE(p.posted_at) < CURRENT_DATE THEN 1 ELSE 0 END)
@@ -48,7 +44,10 @@ def get_stocks(db: Session = Depends(get_db)):
             LEFT JOIN posts p ON p.stock_code = s.stock_code
             GROUP BY s.stock_code, s.stock_name
             ORDER BY today_total DESC NULLS LAST, total DESC
-        """))
+        """), {
+            "pos_th": settings.sentiment_positive_threshold,
+            "neg_th": -settings.sentiment_positive_threshold,
+        })
         rows = result.fetchall()
 
         # 2. 오늘 제목 목록 — 핫키워드 추출용
@@ -108,8 +107,8 @@ def get_daily_summary(stock_code: str, db: Session = Depends(get_db)):
 
         titles = "\n".join(f"- {r.title}" for r in rows)
 
-        response = _openai.chat.completions.create(
-            model="gpt-4o-mini",
+        response = openai_client.chat.completions.create(
+            model=settings.llm_model,
             max_tokens=400,
             response_format={"type": "json_object"},
             messages=[{
