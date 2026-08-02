@@ -29,6 +29,14 @@ class Settings(BaseSettings):
         alias="CORS_ORIGINS",
     )
 
+    # --- 실행 모드 ---
+    # 서빙 인스턴스는 DB를 읽어 API만 제공하고, 수집·감성분석은 배치(GitHub
+    # Actions 등)에서 돌린다. 그래야 서빙 쪽에 torch/transformers를 설치하지 않아도
+    # 되고 메모리를 크게 줄일 수 있다. 로컬에서 예전처럼 다 돌리려면 셋 다 true로.
+    enable_scheduler: bool = False        # 앱 내 주기적 크롤링 스케줄러
+    enable_startup_crawl: bool = False    # 기동 직후 1회 빠른 크롤링
+    preload_sentiment_model: bool = False  # 기동 시 감성분석 모델 선로드
+
     # --- 크롤러 ---
     crawl_interval_minutes: int = 10
     crawl_pages: int = 3              # 정기 크롤링 시 수집할 종토방 페이지 수
@@ -56,6 +64,9 @@ class Settings(BaseSettings):
     rrf_k: int = 60               # RRF 순위 충격 완화 상수
     search_candidate_k: int = 20  # 각 검색기에서 뽑을 후보 수
     search_top_k: int = 5         # 최종 반환 개수
+    # BM25 인덱스에 담을 기간(일). 인덱스는 메모리 상주라 제한이 없으면
+    # 게시글이 쌓이는 만큼 계속 커진다. 0이면 전체 기간.
+    bm25_window_days: int = 180
 
     @property
     def cors_origins(self) -> list[str]:

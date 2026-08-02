@@ -2,23 +2,20 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.api.routes import api_router
 from app.core.config import settings
-from app.crawler import crawl_all
-from app.crawler.community import crawl_quick_all
 
-_scheduler = BackgroundScheduler(timezone=settings.scheduler_timezone)
+_scheduler = None
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # 테이블 자동 생성 + stocks 초기 데이터
+def _seed_initial_data() -> None:
+    """테이블 생성 + 최초 실행 시 기본 종목 시드."""
     import app.models  # noqa: F401 — Base에 모든 모델 등록
     from app.core.database import Base, engine, SessionLocal
     from app.models.stock import Stock
     from app.crawler.community import STOCK_LIST
+
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
@@ -30,25 +27,50 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
-    # 감성 분석 모델 선(先)로드 — 첫 크롤링 전에 준비
-    from app.sentiment import get_pipeline
-    get_pipeline()
 
-    # BM25 인덱스 초기 빌드 — 기존 게시글 대상
-    from app.rag.bm25_index import rebuild_index
-    rebuild_index()
+def _start_scheduler() -> None:
+    """주기적 크롤링 스케줄러 기동 (배치를 앱 안에서 돌릴 때만)."""
+    global _scheduler
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from app.crawler import crawl_all
 
-    # 서버 시작 시 빠른 초기 크롤링 (백그라운드)
-    import threading
-    threading.Thread(target=crawl_quick_all, daemon=True).start()
-    print("초기 빠른 크롤링 시작 (백그라운드)...")
-
+    _scheduler = BackgroundScheduler(timezone=settings.scheduler_timezone)
     _scheduler.add_job(crawl_all, "interval", minutes=settings.crawl_interval_minutes)
     _scheduler.start()
     print(f"스케줄러 시작 — {settings.crawl_interval_minutes}분마다 전체 크롤링 반복합니다.")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _seed_initial_data()
+
+    # 감성 분석 모델 선(先)로드 — 앱 안에서 크롤링을 돌릴 때만 의미가 있다.
+    # 서빙 전용 모드에서는 이 블록을 타지 않으므로 transformers/torch가 필요 없다.
+    if settings.preload_sentiment_model:
+        from app.sentiment import get_pipeline
+        get_pipeline()
+
+    # BM25 인덱스 초기 빌드 — 기존 게시글 대상 (서빙에 필요)
+    from app.rag.bm25_index import rebuild_index
+    rebuild_index()
+
+    if settings.enable_startup_crawl:
+        import threading
+        from app.crawler.community import crawl_quick_all
+
+        threading.Thread(target=crawl_quick_all, daemon=True).start()
+        print("초기 빠른 크롤링 시작 (백그라운드)...")
+
+    if settings.enable_scheduler:
+        _start_scheduler()
+    else:
+        print("서빙 전용 모드 — 크롤링/스케줄러 비활성화 (배치에서 수집합니다).")
+
     yield
-    _scheduler.shutdown()
-    print("스케줄러 종료.")
+
+    if _scheduler is not None:
+        _scheduler.shutdown()
+        print("스케줄러 종료.")
 
 
 app = FastAPI(title="Hearsay API", lifespan=lifespan)

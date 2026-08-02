@@ -57,14 +57,25 @@ def list_managed_stocks(db: Session = Depends(get_db)):
 
 
 def _crawl_single(stock_code: str, stock_name: str):
-    """추가된 종목 즉시 크롤링 (백그라운드 실행) — 빠른 버전"""
+    """
+    추가된 종목 즉시 크롤링 (백그라운드 실행) 
+    """
     try:
         from app.crawler.community import fetch_posts_quick, save_posts
-        from app.sentiment import score_all_posts
 
         posts = fetch_posts_quick(stock_code, stock_name)
         save_posts(posts)
-        score_all_posts()
+
+        try:
+            from app.sentiment import score_all_posts
+            score_all_posts()
+        except ImportError:
+            print("[즉시 크롤링] 감성 분석 모델 없음 — 다음 배치에서 채점합니다.")
+
+        # 새 게시글을 검색에 바로 반영 (증분이라 새 id만 읽는다)
+        from app.rag.bm25_index import rebuild_index
+        rebuild_index()
+
         print(f"[즉시 크롤링 완료] {stock_name}({stock_code}): {len(posts)}개")
     except Exception as e:
         print(f"[즉시 크롤링 실패] {stock_name}({stock_code}): {e}")
