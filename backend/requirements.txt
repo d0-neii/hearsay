@@ -1,5 +1,11 @@
-# Hearsay backend dependencies
+# Hearsay backend dependencies — 서빙(API) 전용
+#
 # 설치: pip install -r requirements.txt
+#
+# 이 파일에는 API 서버가 뜨는 데 필요한 것만 담는다.
+# 크롤링·감성분석·파인튜닝용 패키지(torch, transformers 등)는
+# requirements-batch.txt 에 따로 있다. 서빙 인스턴스에 torch를 올리지 않는 것만으로
+# 메모리가 2GB 이상 줄어들기 때문에 분리해 둔다.
 #
 # 직접 사용하는 패키지만 명시합니다 (전이 의존성은 pip이 해결)
 # 버전은 현재 venv 기준으로 고정
@@ -16,25 +22,17 @@ SQLAlchemy==2.0.51
 psycopg2-binary==2.9.12
 pgvector==0.4.2
 
-# --- Crawling ---
-requests==2.34.2
-beautifulsoup4==4.15.0
-APScheduler==3.11.3
-
-# --- LLM / Embedding ---
+# --- LLM / Embedding (RAG 답변 생성, 쿼리 임베딩) ---
 openai==2.44.0
-
-# --- Sentiment (KR-FinBert) ---
-transformers==5.13.0
-torch==2.12.1
-accelerate==1.14.0
 
 # --- Search ---
 rank-bm25==0.2.2
 
-# --- Market data ---
+# --- Market data (실시간 조회라 서빙에서 직접 호출) ---
 pykrx==1.2.8
 
-# --- Scripts (finetune / eval) ---
-scikit-learn==1.9.0
-numpy==2.5.0
+# --- HTTP / 파싱 ---
+# requests: 종목 검색(KRX) 엔드포인트에서 사용
+# beautifulsoup4: app.crawler 패키지 import 체인에 필요
+requests==2.34.2
+beautifulsoup4==4.15.0

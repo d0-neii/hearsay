@@ -1,0 +1,26 @@
+# Hearsay backend dependencies — 배치(수집 / 감성분석 / 학습) 전용
+#
+# 설치: pip install -r requirements-batch.txt
+#
+# 서빙용 의존성을 그대로 포함하고, 여기에 모델 관련 패키지를 더한다.
+# GitHub Actions 러너와 로컬 개발 환경에서 이 파일을 쓴다.
+#
+# torch는 GPU 빌드를 받으면 내려받는 용량이 몇 배로 늘어난다. CPU 추론만 하므로
+# 아래처럼 CPU 휠을 먼저 설치한 뒤 이 파일을 설치하는 것을 권장한다.
+#
+#   pip install torch==2.12.1 --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements-batch.txt
+
+-r requirements.txt
+
+# --- Sentiment (KR-FinBert) ---
+transformers==5.13.0
+torch==2.12.1
+accelerate==1.14.0
+
+# --- 앱 내 주기 실행 (ENABLE_SCHEDULER=true 로 로컬에서 돌릴 때) ---
+APScheduler==3.11.3
+
+# --- Scripts (finetune / eval) ---
+scikit-learn==1.9.0
+numpy==2.5.0
