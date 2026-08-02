@@ -1,0 +1,39 @@
+# 로컬 개발용 PostgreSQL(+pgvector).
+#
+# 배포 환경(Neon)과 같은 확장을 쓰기 위해 pgvector가 포함된 이미지를 사용한다.
+# 백엔드는 컨테이너에 넣지 않고 venv에서 직접 띄우는 편이 편하다.
+# 로컬에서는 크롤링·감성분석까지 한 프로세스에서 돌리는 경우가 많은데,
+# 그러려면 torch가 필요해서 서빙용 이미지와 구성이 달라지기 때문이다.
+#
+# 사용법:
+#   docker compose up -d
+#   cd backend && source venv/bin/activate
+#   uvicorn app.main:app --reload
+#
+# backend/.env 예시:
+#   DATABASE_URL=postgresql://hearsay:hearsay@localhost:5432/hearsay
+#   ENABLE_SCHEDULER=true
+#   ENABLE_STARTUP_CRAWL=true
+#   PRELOAD_SENTIMENT_MODEL=true
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: hearsay-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hearsay
+      POSTGRES_PASSWORD: hearsay
+      POSTGRES_DB: hearsay
+    ports:
+      - "5432:5432"
+    volumes:
+      - hearsay-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hearsay -d hearsay"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  hearsay-pgdata:

@@ -1,0 +1,29 @@
+# 이미지에 들어가면 안 되는 것들.
+# 특히 finetuned_model/은 3GB가 넘어서 반드시 제외해야 한다.
+# (배치는 GitHub Actions에서 돌고, 모델은 HuggingFace에서 받는다.)
+
+finetuned_model/
+venv/
+.venv/
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 비밀값은 런타임 환경변수로 주입한다
+.env
+.env.*
+!.env.example
+
+# 서빙 이미지에 불필요한 것들
+eval/
+labeled_data.csv
+*.csv
+*.ipynb
+
+.git/
+.gitignore
+README.md
