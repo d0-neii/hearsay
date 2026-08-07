@@ -1,20 +1,5 @@
 """
-배치 파이프라인 진입점 — 수집 → 감성분석 → 임베딩.
-
-서빙 인스턴스(API 서버)는 DB를 읽기만 하고, 데이터를 채우는 일은 전부 여기서 한다.
-GitHub Actions에서 하루 1회 실행하는 것을 기본으로 하며, 로컬에서도 같은 명령으로
-돌릴 수 있다.
-
-이렇게 나눠 두면 서빙 쪽에 torch/transformers를 설치하지 않아도 되고,
-배치가 끝나면 별도 배포 없이 다음 요청부터 새 데이터가 보인다.
-
-실행:
-    cd backend
-    python scripts/run_batch.py
-
-필요한 환경변수:
-    DATABASE_URL, OPENAI_API_KEY
-    (선택) SENTIMENT_MODEL_FALLBACK — 파인튜닝 모델의 HuggingFace repo id
+배치 파이프라인 진입점 — 수집 → 감성분석 → 임베딩
 """
 
 import sys

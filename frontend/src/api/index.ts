@@ -10,9 +10,6 @@ import {
 } from '../types'
 import type { StockSummary, PostItem, SentimentPoint, AskResult, DailySummary, TradingData } from '../types'
 
-// 로컬 개발에서는 값을 비워두고 vite dev server의 proxy(/api → localhost:8000)를
-// 그대로 쓴다. 배포본에는 proxy가 존재하지 않으므로 VITE_API_BASE_URL에
-// 백엔드 주소(예: https://api.example.com)를 넣어야 요청이 나간다.
 const httpClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
 })

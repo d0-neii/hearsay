@@ -50,9 +50,17 @@ async def lifespan(app: FastAPI):
         from app.sentiment import get_pipeline
         get_pipeline()
 
-    # BM25 인덱스 초기 빌드 — 기존 게시글 대상 (서빙에 필요)
-    from app.rag.bm25_index import rebuild_index
-    rebuild_index()
+    import threading
+
+    def _build_index_background() -> None:
+        try:
+            from app.rag.bm25_index import rebuild_index
+            rebuild_index()
+        except Exception as e:  # 인덱스 실패로 서버 전체가 죽지 않도록
+            print(f"[bm25] 초기 인덱스 빌드 실패 — {type(e).__name__}: {e}")
+
+    threading.Thread(target=_build_index_background, daemon=True).start()
+    print("BM25 인덱스 백그라운드 빌드 시작...")
 
     if settings.enable_startup_crawl:
         import threading
